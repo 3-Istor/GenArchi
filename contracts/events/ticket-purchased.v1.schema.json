@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://genarchi.invalid/contracts/events/ticket-purchased.v1.schema.json",
+  "title": "fr.genarchi.ticket.purchased.v1 — data",
+  "description": "Payload `data` du CloudEvent émis par l'API après le commit d'une commande.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["order_id", "event_id", "ticket_ids", "quantity", "amount_cents", "buyer_email", "purchased_at"],
+  "properties": {
+    "order_id": { "type": "string", "minLength": 1 },
+    "event_id": { "type": "string", "minLength": 1 },
+    "ticket_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true
+    },
+    "quantity": { "type": "integer", "minimum": 1, "maximum": 4 },
+    "amount_cents": { "type": "integer", "minimum": 0 },
+    "buyer_email": { "type": "string", "format": "email" },
+    "purchased_at": { "type": "string", "format": "date-time" }
+  }
+}
