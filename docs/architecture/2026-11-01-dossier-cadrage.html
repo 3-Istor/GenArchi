@@ -1,0 +1,663 @@
+<title>Projet Gen Archi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: dossier technique, une colonne de lecture + nav collante ; deux couleurs codent les deux générations (cuivre = P2 datacenter, bleu = P3 cloud) */
+:root{
+  --bg:#F2F4F3; --surface:#FFFFFF; --ink:#16201F; --muted:#56635F; --line:#D3DBD8;
+  --p2:#9C4E17; --p2-soft:#F5E7DB; --p3:#16698A; --p3-soft:#DCEDF3;
+  --ok:#2E7D4F; --warn:#9A6A00; --ok-soft:#E1F1E7; --warn-soft:#FBF0D6;
+  --code:#EAEFED;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1513; --surface:#151E1C; --ink:#E2EAE7; --muted:#95A5A1; --line:#283531;
+  --p2:#E58C4C; --p2-soft:#36241A; --p3:#5DB9D8; --p3-soft:#123039;
+  --ok:#6BCB92; --warn:#E3B54A; --ok-soft:#16301F; --warn-soft:#352A10; --code:#1C2725;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1513; --surface:#151E1C; --ink:#E2EAE7; --muted:#95A5A1; --line:#283531;
+  --p2:#E58C4C; --p2-soft:#36241A; --p3:#5DB9D8; --p3-soft:#123039;
+  --ok:#6BCB92; --warn:#E3B54A; --ok-soft:#16301F; --warn-soft:#352A10; --code:#1C2725;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1080px;margin:0 auto}
+a{color:var(--p3)}
+a:focus-visible,button:focus-visible,input:focus-visible+label{outline:2px solid var(--p3);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.1;margin:0}
+h2{font-size:clamp(1.6rem,3.2vw,2.2rem);font-stretch:112%;font-weight:750;letter-spacing:-.01em}
+h3{font-size:1.15rem;font-weight:700;font-stretch:105%}
+p{margin:0}
+.prose{max-width:68ch;display:grid;gap:.8em}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+code{background:var(--code);padding:.1em .35em;border-radius:4px}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.tag{display:inline-block;font-family:var(--f-mono);font-size:.72rem;font-weight:500;padding:.15em .55em;border-radius:3px;letter-spacing:.04em;white-space:nowrap}
+.t2{background:var(--p2-soft);color:var(--p2)}
+.t3{background:var(--p3-soft);color:var(--p3)}
+.tok{background:var(--ok-soft);color:var(--ok)}
+.twarn{background:var(--warn-soft);color:var(--warn)}
+
+/* nav */
+nav.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+  margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+nav.top .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:8px;scrollbar-width:none}
+nav.top a{flex:none;font-size:.82rem;text-decoration:none;color:var(--muted);padding:.3em .7em;border-radius:4px;white-space:nowrap}
+nav.top a:hover{color:var(--ink);background:var(--surface)}
+
+/* hero */
+header.hero{padding-block:48px 36px;display:grid;gap:28px}
+.hero h1{font-size:clamp(2.2rem,6vw,4.2rem);font-stretch:120%;font-weight:800;letter-spacing:-.02em;max-width:16ch}
+.hero h1 .c2{color:var(--p2)} .hero h1 .c3{color:var(--p3)}
+.hero .lede{font-size:1.15rem;max-width:62ch}
+.split{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.split > div{padding:18px 20px;display:grid;gap:6px;align-content:start;min-width:0}
+.split .s2{background:var(--p2-soft)} .split .s3{background:var(--p3-soft)}
+.split b{font-family:var(--f-display);font-stretch:112%;font-size:1.25rem}
+.s2 b{color:var(--p2)} .s3 b{color:var(--p3)}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.facts div{background:var(--surface);padding:14px 16px;display:grid;gap:2px;min-width:0}
+.facts strong{font-family:var(--f-display);font-size:1.05rem;font-stretch:108%}
+.facts span{font-size:.85rem;color:var(--muted)}
+
+section{padding-block:56px 8px;scroll-margin-top:56px;display:grid;gap:22px}
+section > header{display:grid;gap:8px}
+.sec-num{font-family:var(--f-mono);font-size:.8rem;color:var(--muted)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px 20px;display:grid;gap:10px;align-content:start;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+ul.tight{margin:0;padding-left:1.1em;display:grid;gap:.35em}
+.callout{border-left:3px solid var(--p3);background:var(--surface);padding:14px 18px;border-radius:0 6px 6px 0;max-width:80ch}
+.callout.warn{border-left-color:var(--warn)}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:760px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+thead th{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--bg)}
+th.h2c{color:var(--p2)} th.h3c{color:var(--p3)}
+td.dim{font-weight:600;white-space:nowrap}
+td.c2{border-left:3px solid var(--p2-soft)} td.c3{border-left:3px solid var(--p3-soft)}
+td .src{display:block;font-size:.78rem;color:var(--muted);margin-top:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* diagrams */
+.diag{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;overflow-x:auto}
+.diag h3{margin-bottom:6px}
+pre.mermaid{margin:0;background:transparent;text-align:center}
+
+/* bonus */
+.bonus{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.bonus .card header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.meter{display:flex;gap:6px;flex-wrap:wrap}
+
+/* timeline */
+.steps{display:grid;gap:0;border-left:2px solid var(--line);margin-left:6px}
+.step{position:relative;padding:0 0 22px 22px;display:grid;gap:6px}
+.step::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--p3)}
+.step .when{font-family:var(--f-mono);font-size:.78rem;color:var(--p3)}
+
+pre.tree{font-family:var(--f-mono);font-size:.82rem;line-height:1.5;background:var(--code);padding:14px 16px;border-radius:6px;overflow-x:auto;margin:0}
+
+/* decisions */
+.dec{display:grid;gap:14px}
+.dcard{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px 18px;display:grid;gap:10px}
+.dcard .why{font-size:.9rem;color:var(--muted)}
+.opts{display:grid;gap:6px}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:5px;cursor:pointer}
+.opt:hover{border-color:var(--p3)}
+.opt input{margin-top:5px;accent-color:var(--p3)}
+.opt.on{border-color:var(--p3);background:var(--p3-soft)}
+.opt .lbl{display:grid;gap:2px;min-width:0}
+.opt .lbl small{color:var(--muted);font-size:.84rem}
+.summary{position:sticky;top:64px;align-self:start}
+.declay{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+#recap{font-family:var(--f-mono);font-size:.8rem;white-space:pre-wrap;background:var(--code);padding:12px;border-radius:5px;margin:0;max-height:360px;overflow:auto}
+button.btn{font:inherit;font-size:.9rem;padding:.5em .9em;border-radius:5px;border:1px solid var(--p3);background:var(--p3);color:var(--surface);cursor:pointer}
+button.btn.ghost{background:transparent;color:var(--p3)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+footer{padding-block:56px 48px;color:var(--muted);font-size:.85rem;display:grid;gap:8px}
+
+@media (max-width:860px){
+  .grid3{grid-template-columns:1fr}
+  .declay{grid-template-columns:1fr}
+  .summary{position:static}
+}
+@media (max-width:640px){
+  .grid2,.bonus,.split{grid-template-columns:1fr}
+  .facts{grid-template-columns:1fr 1fr}
+  header.hero{padding-block:32px 24px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+html{scroll-behavior:smooth}
+</style>
+
+<nav class="top" aria-label="Sections">
+  <div class="wrap">
+    <a href="#essentiel">L'essentiel</a>
+    <a href="#frontiere">Frontière P2 / P3</a>
+    <a href="#appli">L'appli</a>
+    <a href="#archi">Archis GCP</a>
+    <a href="#protocole">Protocole de test</a>
+    <a href="#bonus">Pour impressionner</a>
+    <a href="#plan">Plan</a>
+    <a href="#budget">Budget</a>
+    <a href="#decisions">Décisions</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<header class="hero">
+  <span class="eyebrow">S9 · SOAR · Génération Architecture · dossier de cadrage</span>
+  <h1>Une appli, <span class="c2">deux générations</span>, <span class="c3">deux Terraform</span>.</h1>
+  <p class="lede">Le TD demande de construire <strong>une application web résiliente</strong> deux fois : une fois comme on l'aurait fait il y a 15 ans dans un datacenter d'entreprise (Platform 2), une fois comme une appli née dans le cloud (Platform 3). Le livrable, ce sont <strong>deux Terraform</strong>. La note se joue sur votre capacité à montrer, preuves à l'appui, ce qui change entre les deux.</p>
+  <div class="split">
+    <div class="s2"><span class="eyebrow">Platform 2</span><b>Redondance de l'infra</b><span>VM nommées, SGBD installé dans une VM, stockage bloc, fichiers et batch de nuit, alerte puis humain. « Pets ».</span></div>
+    <div class="s3"><span class="eyebrow">Platform 3</span><b>Résilience de l'application</b><span>Containers jetables, services managés, objet, événements, multi-région, remédiation automatique. « Cattle ».</span></div>
+  </div>
+  <div class="facts">
+    <div><strong>2 Terraform</strong><span>Livrable officiel (P2 + P3)</span></div>
+    <div><strong>~3 suivis</strong><span>Points d'étape avec le prof</span></div>
+    <div><strong>1 soutenance</strong><span>3 h de créneau prévu</span></div>
+    <div><strong>9 h de TD</strong><span>Sur 30 h de cours au total</span></div>
+  </div>
+</header>
+
+<!-- 1 -->
+<section id="essentiel">
+  <header><span class="sec-num">01</span><h2>Ce que le projet est, concrètement</h2></header>
+  <div class="prose">
+    <p>Le cours de Yannick Neff part d'une idée simple : <em>« On ne fait pas de l'IT aujourd'hui comme il y a 20 ans »</em>. À un instant T, une entreprise a plusieurs générations d'IT qui cohabitent. Le projet vous fait vivre cette cohabitation : même besoin métier, deux réponses d'époques différentes.</p>
+    <p>Trois glissements résument tout le cours (Cours 1, slide 8). Ce sont eux que votre soutenance doit rendre visibles :</p>
+  </div>
+  <div class="grid3">
+    <div class="card"><span class="eyebrow">Glissement 1</span><h3>Infrastructure based → application based</h3><p class="muted">En P2, c'est l'infra qui porte la qualité de service. En P3, c'est l'application qui est conçue pour survivre à une infra qui tombe.</p></div>
+    <div class="card"><span class="eyebrow">Glissement 2</span><h3>Redondance → résilience</h3><p class="muted">P2 double les équipements (2 serveurs, 2 DC, réplique de base). P3 suppose que tout casse et se reconstruit tout seul.</p></div>
+    <div class="card"><span class="eyebrow">Glissement 3</span><h3>Pets → cattle</h3><p class="muted">En P2, <code>db-01</code> a un nom, on le soigne, on le patche. En P3, une instance malade est détruite et remplacée.</p></div>
+  </div>
+  <div class="callout">
+    <p><strong>Le point clé à comprendre :</strong> vous faites les deux sur GCP. La Platform 2 n'est donc pas « l'ancien monde physique », c'est la colonne <em>« Virtual 2 Virtual / DC as a Service »</em> du cours (Cours 1, slide 10) : on utilise le cloud comme un datacenter virtuel, sans transformer l'application. Votre P2 émule un datacenter d'entreprise dans GCP. Votre P3 est la colonne <em>« Born 2 be Cloud »</em>.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Ce qui est demandé (écrit dans les slides)</h3>
+      <ul class="tight">
+        <li>Construire <strong>1 application web résiliente</strong> en Platform 2 et en Platform 3</li>
+        <li>Livrable : <strong>2 Terraform</strong> (un par plateforme)</li>
+        <li>~3 suivis puis une soutenance</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Ce qui n'est pas écrit et qu'il faut clarifier</h3>
+      <ul class="tight">
+        <li>GCP accepté (les exemples du cours sont tous AWS) ?</li>
+        <li>Appli imposée ou libre ? Démo live attendue ?</li>
+        <li>Grille de notation, dates des suivis, taille d'équipe</li>
+      </ul>
+      <p class="muted" style="font-size:.88rem">La liste complète des questions à poser est en bas, section Décisions.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section id="frontiere">
+  <header><span class="sec-num">02</span><h2>La frontière P2 / P3, traduite en choix GCP</h2>
+  <p class="muted" style="max-width:70ch">Chaque ligne reprend une dimension du cours (Cours 1 slide 10 et Cours 4 slide 5) et dit quelle brique GCP la matérialise de chaque côté. C'est votre grille de lecture pour tout le projet.</p></header>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Dimension</th><th>Ce que dit le cours</th><th class="h2c">Platform 2 sur GCP</th><th class="h3c">Platform 3 sur GCP</th></tr></thead>
+      <tbody>
+        <tr><td class="dim">Compute</td><td>VM / serveur → container / lambda</td><td class="c2">Compute Engine, VM nommées (<code>web-01</code>, <code>app-01</code>, <code>db-01</code>…), groupe d'instances non managé</td><td class="c3">Cloud Run : containers anonymes, de 0 à N instances</td></tr>
+        <tr><td class="dim">Scalabilité</td><td>Verticale → horizontale</td><td class="c2">Changer le type de machine (arrêt, resize, redémarrage)</td><td class="c3">Autoscaling sur la charge réelle, piloté par la concurrence de requêtes</td></tr>
+        <tr><td class="dim">Découpage</td><td>Monolithe → microservices</td><td class="c2">Architecture 3 tiers « PAD » : web (nginx) → serveur d'appli → base</td><td class="c3">Services séparés : <code>api</code>, <code>worker</code>, front statique</td></tr>
+        <tr><td class="dim">Stockage</td><td>Block → object</td><td class="c2">Persistent Disk (bloc) + partage NFS sur une VM (NAS)</td><td class="c3">Cloud Storage, bucket versionné (journalisation intégrée)</td></tr>
+        <tr><td class="dim">Middleware / données</td><td>SGBDR installé dans la VM, ACID → DBaaS, NoSQL</td><td class="c2">PostgreSQL installé sur VM : primaire + réplique en streaming</td><td class="c3">Firestore multi-région <code>eur3</code> (NoSQL managé), ou Cloud SQL (voir décisions)</td></tr>
+        <tr><td class="dim">Échanges</td><td>Fichiers → API, événements, logs</td><td class="c2">Export CSV nocturne déposé sur le partage NFS</td><td class="c3">Pub/Sub : chaque achat publie un événement consommé en temps réel</td></tr>
+        <tr><td class="dim">Réseau</td><td>VLAN, subnet /24, firewall → SDN, security groups, réseau centré appli</td><td class="c2">VPC custom, 3 sous-réseaux /24 (front, app, data), règles firewall par plage d'IP, bastion</td><td class="c3">Aucun subnet à gérer ; les services s'authentifient par identité (IAM) ; WAF Cloud Armor</td></tr>
+        <tr><td class="dim">Haute dispo / DR</td><td>Mono-AZ ou dual-DC, DRP manuel → multi-AZ multi-région, DRP testé en permanence</td><td class="c2">2 zones d'une région (= « 2 DC campus »), bascule de la base par runbook</td><td class="c3">2 régions actives, bascule automatique, test de chaos planifié</td></tr>
+        <tr><td class="dim">Déploiement</td><td>Manuel, user-data, « Puppet-like » → template applicatif</td><td class="c2">Terraform construit le « DC », Ansible ou startup-script installe, mise en prod par procédure</td><td class="c3">Terraform + CI/CD : build, image, déploiement canary par répartition de trafic</td></tr>
+        <tr><td class="dim">Patching</td><td>Patch → rebuild</td><td class="c2"><code>apt upgrade</code> en place, fenêtre de maintenance</td><td class="c3">Nouvelle image à chaque build, l'ancienne révision disparaît</td></tr>
+        <tr><td class="dim">Monitoring</td><td>Alerte puis traitement manuel → observabilité, remédiation auto</td><td class="c2">Zabbix ou Centreon sur une VM, agents en push/pull, alerte par mail</td><td class="c3">OpenTelemetry, traces, SLO ; une alerte déclenche une action automatique</td></tr>
+        <tr><td class="dim">Sauvegarde</td><td>Plan de sauvegarde et batch → mécanismes intégrés</td><td class="c2">cron <code>pg_dump</code> + snapshots de disques planifiés</td><td class="c3">PITR Firestore + export planifié, versioning du bucket</td></tr>
+        <tr><td class="dim">Batch</td><td>« Nuit batch » → temps réel, business 24/7</td><td class="c2">Job cron qui génère les billets toutes les 15 min</td><td class="c3">Un événement déclenche le worker en quelques secondes</td></tr>
+        <tr><td class="dim">Exploitation</td><td>ITIL, infogérance → DevOps, SRE, NoOps</td><td class="c2">Demande de changement (RFC) validée avant chaque <code>apply</code>, runbooks écrits</td><td class="c3">SLO et error budget, déploiement automatique conditionné aux métriques</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <span class="tag t2">Pièges côté P2</span>
+      <h3>Ce qui ferait glisser votre P2 vers P3</h3>
+      <ul class="tight">
+        <li><strong>Managed Instance Group avec autoscaling et autohealing</strong> : c'est la colonne « Cloud-Ready », plus du P2</li>
+        <li><strong>Cloud SQL</strong> : un DBaaS est explicitement classé hors P2 dans le cours</li>
+        <li><strong>Docker sur les VM</strong> : le container est la brique P3 du cours</li>
+        <li><strong>Stocker les fichiers dans un bucket</strong> : l'objet est P3, P2 c'est bloc et NAS</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag t3">Pièges côté P3</span>
+      <h3>Ce qui trahirait une P3 « déguisée »</h3>
+      <ul class="tight">
+        <li>Une seule région, ou une base dans une seule zone</li>
+        <li>De l'état stocké dans l'instance (sessions, fichiers locaux)</li>
+        <li>Un cron de nuit au lieu d'événements</li>
+        <li>Des clics dans la console, ou des clés de service account dans le repo</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout warn">
+    <p><strong>Terraform des deux côtés, ce n'est pas contradictoire.</strong> Le livrable impose l'IaC partout. La différence est dans ce que le code décrit : en P2, Terraform construit un datacenter que des humains exploitent ensuite ; en P3, le code décrit l'application entière et son exploitation. Dites-le explicitement en soutenance, c'est exactement la nuance du cours entre « l'infra se builde » et « l'infra se code ».</p>
+  </div>
+
+  <div class="card">
+    <h3>Les 12 facteurs (Cours 4) : comment prouver chacun dans votre P3</h3>
+    <div class="tbl" style="border:0">
+      <table style="min-width:620px">
+        <thead><tr><th>Facteur</th><th>Preuve concrète dans le repo ou la démo</th></tr></thead>
+        <tbody>
+          <tr><td class="dim">Base de code</td><td>Un repo, une image, déployée dans 2 régions et en P2</td></tr>
+          <tr><td class="dim">Dépendances</td><td><code>requirements.txt</code> ou <code>package-lock.json</code>, image construite en CI</td></tr>
+          <tr><td class="dim">Configuration</td><td>Variables d'environnement + Secret Manager, aucune valeur en dur</td></tr>
+          <tr><td class="dim">Services externes</td><td>Le même code parle à PostgreSQL (P2) ou Firestore (P3) selon une variable : c'est le meilleur exemple possible</td></tr>
+          <tr><td class="dim">Build / release / run</td><td>Build en CI → image taguée → révision Cloud Run + config</td></tr>
+          <tr><td class="dim">Processus sans état</td><td>Aucune session ni fichier local ; on tue une instance sans perte</td></tr>
+          <tr><td class="dim">Jetable</td><td>Démarrage à froid mesuré, arrêt propre sur SIGTERM</td></tr>
+          <tr><td class="dim">Parité dev / prod</td><td><code>docker compose</code> en local avec l'émulateur Firestore</td></tr>
+          <tr><td class="dim">Logs en flux</td><td>Logs JSON sur stdout, agrégés automatiquement</td></tr>
+          <tr><td class="dim">Admin one-off</td><td>Migrations et seed lancés comme Cloud Run jobs</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section id="appli">
+  <header><span class="sec-num">03</span><h2>L'application à construire</h2>
+  <p class="muted" style="max-width:70ch">Le choix de l'appli compte : elle doit rendre visibles les différences P2/P3 (pic de charge, stockage de fichiers, traitement asynchrone, transaction). Une simple to-do list ne montrerait presque rien.</p></header>
+  <div class="grid3">
+    <div class="card" style="border-color:var(--p3)">
+      <div class="row"><span class="tag tok">Recommandé</span></div>
+      <h3>Billetterie d'événement</h3>
+      <p class="muted">Ex. la billetterie du gala de l'école. Ouverture des ventes à 18 h 00 = pic de charge réaliste. Stock de places = transaction critique (pas de survente). Billet QR généré après achat = traitement asynchrone et fichier stocké.</p>
+    </div>
+    <div class="card">
+      <h3>Partage de photos avec traitement</h3>
+      <p class="muted">Upload → miniatures. Très parlant pour bloc vs objet et batch vs événement. Moins bon pour montrer les transactions et la montée en charge.</p>
+    </div>
+    <div class="card">
+      <h3>Réservation de salles</h3>
+      <p class="muted">Simple à coder, mais charge faible et peu d'asynchrone : la P3 paraîtra surdimensionnée et la démo sera plate.</p>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Spec fonctionnelle minimale (billetterie)</h3>
+      <ul class="tight">
+        <li><strong>Visiteur</strong> : liste des événements et places restantes</li>
+        <li><strong>Acheter</strong> : décrément atomique du stock, jamais de survente</li>
+        <li><strong>Recevoir son billet</strong> : QR code généré puis téléchargeable</li>
+        <li><strong>Contrôle d'entrée</strong> : scan du QR, validation idempotente (un billet ne passe qu'une fois)</li>
+        <li><strong>Admin</strong> : créer un événement, voir les ventes, exporter</li>
+      </ul>
+      <p class="muted" style="font-size:.88rem">API : <code>GET /events</code>, <code>POST /events/{id}/orders</code>, <code>GET /tickets/{id}</code>, <code>POST /tickets/{id}/scan</code>, <code>GET /healthz</code>. Pas de paiement réel.</p>
+    </div>
+    <div class="card">
+      <h3>Exigences non fonctionnelles (à afficher en soutenance)</h3>
+      <div class="tbl" style="border:0">
+        <table style="min-width:0">
+          <thead><tr><th>Cible</th><th class="h2c">P2</th><th class="h3c">P3</th></tr></thead>
+          <tbody class="num">
+            <tr><td>Modèle SLA (Cours 1 sl. 9)</td><td>Designed for failover, 99,9 %</td><td>Designed for failure, always on</td></tr>
+            <tr><td>RTO perte d'une zone</td><td>≤ 30 min (runbook)</td><td>≤ 1 min (auto)</td></tr>
+            <tr><td>RPO</td><td>≤ 5 min (réplication async)</td><td>≈ 0 (multi-région synchrone)</td></tr>
+            <tr><td>Pic à l'ouverture</td><td>Tenu jusqu'à la taille des VM</td><td>Absorbé par scale-out</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" style="font-size:.85rem">Ce sont des cibles de départ, à confirmer par le protocole de test.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Le même parcours d'achat, vécu par chaque plateforme</h3>
+    <div class="grid2" style="gap:18px">
+      <div style="display:grid;gap:6px"><span class="tag t2" style="justify-self:start">P2 · data-driven</span>
+        <ol class="tight"><li>nginx sur <code>web-01</code> reçoit la requête</li><li><code>app-01</code> ouvre une transaction SQL et décrémente le stock</li><li>La commande attend en base</li><li>Toutes les 15 min, le cron de <code>batch-01</code> génère les QR et les dépose sur le partage NFS</li><li>La nuit, un export CSV des ventes part vers le « partenaire » par fichier</li></ol></div>
+      <div style="display:grid;gap:6px"><span class="tag t3" style="justify-self:start">P3 · event-driven</span>
+        <ol class="tight"><li>Le load balancer global route vers la région la plus proche et saine</li><li><code>api</code> fait une transaction Firestore</li><li>Il publie <code>ticket.purchased</code> sur Pub/Sub</li><li>Le <code>worker</code> génère le QR dans Cloud Storage en quelques secondes</li><li>Le même événement alimente BigQuery : stats de ventes en temps réel</li></ol></div>
+    </div>
+    <p class="muted" style="font-size:.9rem">C'est la slide « Data-driven vs Event-driven » (Cours 4, slide 6) rendue concrète : en P2 la source de vérité est la base, en P3 c'est le flux d'événements.</p>
+  </div>
+  <div class="callout"><p><strong>Un seul code, deux adaptateurs.</strong> Écrivez l'API avec une couche d'accès aux données interchangeable (<code>Repository</code> PostgreSQL ou Firestore, choisi par variable d'environnement). Vous gardez une seule base de code, et vous illustrez le facteur « services externes comme ressources attachées » mot pour mot. Stack conseillée : Python FastAPI ou Node, selon ce que l'équipe maîtrise.</p></div>
+</section>
+
+<!-- 4 -->
+<section id="archi">
+  <header><span class="sec-num">04</span><h2>Les deux architectures sur GCP</h2>
+  <p class="muted" style="max-width:70ch">Deux projets GCP séparés (<code>gen-archi-p2</code>, <code>gen-archi-p3</code>) : cloisonnement des environnements comme dans le Cours 4, et facture lisible par plateforme.</p></header>
+
+  <div class="diag">
+    <h3><span class="tag t2">Platform 2</span>&nbsp; Datacenter virtuel, une région, deux zones</h3>
+<pre class="mermaid">
+flowchart LR
+  U["Utilisateurs"] --> LB["Load balancer régional HTTP(S)<br/>health checks"]
+  subgraph VPC["VPC gen-archi-p2 · europe-west9 Paris · subnets /24 front, app, data"]
+    direction LR
+    subgraph ZA["Zone a = DC 1"]
+      W1["web-01<br/>nginx"] --> A1["app-01<br/>serveur d'appli"]
+      DB1[("db-01<br/>PostgreSQL primaire")]
+      NFS["nfs-01<br/>partage NAS"]
+      MON["mon-01<br/>Zabbix"]
+    end
+    subgraph ZB["Zone b = DC 2"]
+      W2["web-02<br/>nginx"] --> A2["app-02<br/>serveur d'appli"]
+      DB2[("db-02<br/>réplique streaming")]
+      BAT["batch-01<br/>cron : QR, pg_dump, export CSV"]
+    end
+    BAS["bastion<br/>accès SSH admin"]
+  end
+  LB --> W1
+  LB --> W2
+  A1 --> DB1
+  A2 --> DB1
+  DB1 -. "réplication async" .-> DB2
+  BAT --> DB1
+  BAT --> NFS
+  A1 --> NFS
+  A2 --> NFS
+  MON -. "agents" .-> W1
+  MON -. "agents" .-> DB1
+</pre>
+    <p class="muted" style="font-size:.88rem;margin-top:8px">Bascule DB : promotion manuelle de <code>db-02</code> selon un runbook, puis changement de l'adresse de la base dans la config des <code>app-0x</code>. C'est voulu : c'est le « DRP manuel » du cours. Snapshots de disques planifiés en plus des dumps.</p>
+  </div>
+
+  <div class="diag">
+    <h3><span class="tag t3">Platform 3</span>&nbsp; Serverless, deux régions actives, événements</h3>
+<pre class="mermaid">
+flowchart LR
+  U["Utilisateurs"] --> GLB["Load balancer global<br/>Cloud Armor WAF + Cloud CDN"]
+  GLB --> FE[("Bucket front statique")]
+  GLB --> R1["Cloud Run api<br/>europe-west1"]
+  GLB --> R2["Cloud Run api<br/>europe-west4"]
+  R1 --> FS[("Firestore eur3<br/>multi-région")]
+  R2 --> FS
+  R1 -- "ticket.purchased" --> PS{{"Pub/Sub"}}
+  R2 -- "ticket.purchased" --> PS
+  PS --> WK["Cloud Run worker<br/>génère le QR"]
+  WK --> GCS[("Cloud Storage<br/>billets, versionné")]
+  PS --> BQ[("BigQuery<br/>ventes temps réel")]
+  CI["GitHub Actions<br/>build, scan, canary"] -.-> R1
+  CI -.-> R2
+  OBS["OpenTelemetry<br/>Trace, Logging, Monitoring, SLO"] -.-> R1
+  OBS -.-> R2
+</pre>
+    <p class="muted" style="font-size:.88rem;margin-top:8px">Les deux régions Cloud Run sont celles qui hébergent les réplicas Firestore <code>eur3</code> (Belgique et Pays-Bas), pour garder une latence base faible. Le load balancer seul ne bascule pas : on active la fonction <em>service health</em> de Cloud Run (bascule et retour automatiques entre régions) et l'<em>outlier detection</em> du load balancer.</p>
+  </div>
+
+  <div class="card">
+    <h3>Le cours parle AWS : correspondances GCP</h3>
+    <div class="tbl" style="border:0">
+      <table style="min-width:560px">
+        <thead><tr><th>Dans les slides (AWS)</th><th>Équivalent GCP</th></tr></thead>
+        <tbody>
+          <tr><td>EC2 / AutoScaling Group</td><td>Compute Engine / Managed Instance Group</td></tr>
+          <tr><td>Availability Zone / Région</td><td>Zone / Région (même logique)</td></tr>
+          <tr><td>Security Group / Network ACL</td><td>Règles firewall VPC (par tag ou service account)</td></tr>
+          <tr><td>ELB / Route 53 / AWS WAF</td><td>Cloud Load Balancing / Cloud DNS / Cloud Armor</td></tr>
+          <tr><td>RDS / DynamoDB</td><td>Cloud SQL ou AlloyDB / Firestore ou Bigtable</td></tr>
+          <tr><td>S3 / Glacier</td><td>Cloud Storage / classes Coldline et Archive</td></tr>
+          <tr><td>Lambda / ECS, EKS</td><td>Cloud Run functions / Cloud Run, GKE</td></tr>
+          <tr><td>SQS, SNS / CloudWatch Events</td><td>Pub/Sub / Eventarc</td></tr>
+          <tr><td>CloudWatch / CloudFormation</td><td>Cloud Monitoring + Logging / Terraform (Infrastructure Manager)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Organisation du repo</h3>
+<pre class="tree">gen-archi/
+├─ app/                 # un seul code : api, worker, front
+│  ├─ api/              # Repository Postgres | Firestore choisi par variable d'env
+│  ├─ worker/
+│  └─ front/
+├─ infra/
+│  ├─ bootstrap/        # projets, APIs, bucket de state, budget, identité CI
+│  ├─ modules/          # vpc, vm, lb, cloud-run-service…
+│  ├─ platform2/        # LIVRABLE 1 : main.tf, variables.tf, outputs.tf
+│  │  └─ ansible/       # install nginx, appli, PostgreSQL, Zabbix
+│  └─ platform3/        # LIVRABLE 2
+├─ ops/
+│  ├─ runbooks/         # P2 : bascule DB, restauration, patch
+│  ├─ loadtests/        # scénarios k6 identiques pour P2 et P3
+│  └─ chaos/            # scripts de panne
+├─ docs/                # DAT P2, ADR (une décision = un fichier)
+└─ .github/workflows/   # plan sur PR, apply sur merge, build et deploy</pre>
+    <p class="muted" style="font-size:.88rem">State Terraform dans un bucket GCS versionné. Identité CI par Workload Identity Federation : aucune clé JSON dans GitHub.</p>
+  </div>
+</section>
+
+<!-- 5 -->
+<section id="protocole">
+  <header><span class="sec-num">05</span><h2>Le protocole de test</h2>
+  <p class="muted" style="max-width:70ch">Le cœur de la soutenance. Chaque scénario est joué à l'identique sur les deux plateformes, pendant qu'un test de charge k6 tourne en fond. On mesure, on ne promet pas. Les valeurs « attendu » sont des hypothèses à vérifier.</p></header>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>#</th><th>Scénario</th><th>Comment on le provoque</th><th>Ce qu'on mesure</th><th class="h2c">P2 attendu</th><th class="h3c">P3 attendu</th></tr></thead>
+      <tbody>
+        <tr><td class="num">T1</td><td class="dim">Ouverture des ventes</td><td>k6 : montée à 500 utilisateurs virtuels en 60 s</td><td>Latence p95, taux d'erreur, nb d'instances</td><td class="c2">Saturation au-delà de la taille des VM, resize = coupure</td><td class="c3">Scale-out, latence stable</td></tr>
+        <tr><td class="num">T2</td><td class="dim">Perte d'un serveur web</td><td>P2 : <code>gcloud compute instances stop web-01</code>. P3 : endpoint qui fait crasher l'instance</td><td>Requêtes perdues, temps de retour au nominal</td><td class="c2">LB retire web-01, un humain doit le réparer</td><td class="c3">Instance remplacée sans action</td></tr>
+        <tr><td class="num">T3</td><td class="dim">Perte de la base primaire</td><td>P2 : arrêt de <code>db-01</code>. P3 : sans objet (multi-région managé)</td><td>RTO, RPO, nb d'actions humaines</td><td class="c2">Runbook : promotion de db-02, ~10 à 30 min</td><td class="c3">Rien à faire</td></tr>
+        <tr><td class="num">T4</td><td class="dim">Perte d'une zone / région</td><td>P2 : tout arrêter en zone a. P3 : casser la région europe-west1 (révision défaillante ou retrait du backend)</td><td>RTO, disponibilité vue par k6</td><td class="c2">DRP manuel</td><td class="c3">Bascule auto sur europe-west4</td></tr>
+        <tr><td class="num">T5</td><td class="dim">Mise en production v2</td><td>Nouvelle version de l'API</td><td>Indisponibilité, temps de rollback</td><td class="c2">Fenêtre de maintenance, déploiement serveur par serveur</td><td class="c3">Canary 10 % → 100 %, rollback en une commande</td></tr>
+        <tr><td class="num">T6</td><td class="dim">Faille de sécurité OS</td><td>Simuler un CVE à corriger</td><td>Délai de correction, dérive de config</td><td class="c2">Patch en place sur chaque VM</td><td class="c3">Rebuild de l'image, redéploiement</td></tr>
+        <tr><td class="num">T7</td><td class="dim">Suppression accidentelle</td><td>Supprimer un événement en base</td><td>Temps de restauration, données perdues</td><td class="c2">Restauration du dernier <code>pg_dump</code></td><td class="c3">PITR à la minute près</td></tr>
+        <tr><td class="num">T8</td><td class="dim">Reconstruction totale</td><td><code>terraform destroy</code> puis <code>apply</code></td><td>Durée jusqu'au premier billet vendu</td><td class="c2">Long, étapes manuelles après apply</td><td class="c3">Quelques minutes, sans intervention</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Le tableau de scores à remplir (votre slide de conclusion)</h3>
+    <div class="tbl" style="border:0">
+      <table style="min-width:520px">
+        <thead><tr><th>Indicateur</th><th class="h2c">P2</th><th class="h3c">P3</th></tr></thead>
+        <tbody class="num">
+          <tr><td>Disponibilité mesurée pendant T1 à T5</td><td class="muted">à mesurer</td><td class="muted">à mesurer</td></tr>
+          <tr><td>RTO / RPO observés (T3, T4)</td><td class="muted">à mesurer</td><td class="muted">à mesurer</td></tr>
+          <tr><td>Nombre d'actions humaines sur l'ensemble des tests</td><td class="muted">à compter</td><td class="muted">à compter</td></tr>
+          <tr><td>Temps de reconstruction (T8)</td><td class="muted">à mesurer</td><td class="muted">à mesurer</td></tr>
+          <tr><td>Coût mensuel au repos / pendant le pic</td><td class="muted">facture</td><td class="muted">facture</td></tr>
+          <tr><td>Lignes de Terraform + lignes de runbook</td><td class="muted">à compter</td><td class="muted">à compter</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:.9rem">« Nombre d'actions humaines » est l'indicateur le plus parlant : il traduit directement le passage ITIL → DevOps → SRE/NoOps du cours (Cours 1, slide 12).</p>
+  </div>
+</section>
+
+<!-- 6 -->
+<section id="bonus">
+  <header><span class="sec-num">06</span><h2>Ce qui peut impressionner</h2>
+  <p class="muted" style="max-width:70ch">Des pratiques actuelles, chacune reliée à une notion du cours pour rester dans le sujet. Classées de la plus rentable à la plus optionnelle.</p></header>
+  <div class="bonus">
+    <div class="card"><header><h3>Démo de chaos en direct</h3><div class="meter"><span class="tag tok">Impact fort</span><span class="tag t3">Effort M</span></div></header>
+      <p>Pendant la soutenance, un tableau de bord montre P2 et P3 côte à côte sous charge k6. Vous « débranchez » une zone ou une région en direct. Le jury voit la courbe P2 tomber et la P3 rester verte.</p>
+      <p class="muted" style="font-size:.88rem">Cours : test de DR, « allers-retours perpétuels » (Cours 4, slide 48). Prévoyez une vidéo de secours si le réseau de la salle lâche.</p></div>
+    <div class="card"><header><h3>DRP testé en permanence</h3><div class="meter"><span class="tag tok">Impact fort</span><span class="tag t3">Effort S</span></div></header>
+      <p>Un Cloud Scheduler casse une région chaque nuit et la rétablit, avec un historique des bascules. Littéralement « test de DRP permanent » du tableau du Cours 1.</p></div>
+    <div class="card"><header><h3>SLO et error budget</h3><div class="meter"><span class="tag tok">Impact fort</span><span class="tag t3">Effort S</span></div></header>
+      <p>Définir un SLO (99,9 % de requêtes en moins de 300 ms) dans Cloud Monitoring, avec alerte sur le taux de consommation du budget. C'est le vocabulaire SRE attendu en P3.</p></div>
+    <div class="card"><header><h3>Coût affiché à chaque PR</h3><div class="meter"><span class="tag tok">Impact fort</span><span class="tag t3">Effort S</span></div></header>
+      <p>Infracost commente chaque pull request avec le delta de coût mensuel, plus <code>terraform plan</code> et un scan de sécurité (Checkov ou Trivy). Montre P2 « toujours allumé » vs P3 à l'usage.</p></div>
+    <div class="card"><header><h3>ITIL joué pour de vrai en P2</h3><div class="meter"><span class="tag twarn">Impact moyen</span><span class="tag t2">Effort S</span></div></header>
+      <p>Un template d'issue « Demande de changement » et un environnement GitHub protégé : l'<code>apply</code> P2 attend l'approbation d'un « CAB ». En P3, le déploiement part seul si les SLO sont bons. People / process / technologies en une image.</p></div>
+    <div class="card"><header><h3>Traçage distribué</h3><div class="meter"><span class="tag twarn">Impact moyen</span><span class="tag t3">Effort M</span></div></header>
+      <p>OpenTelemetry dans l'API et le worker : une trace suit l'achat du load balancer jusqu'à Firestore puis Pub/Sub. Illustre « monitoring = détecter, observabilité = trouver la cause » (Cours 4, slide 31).</p></div>
+    <div class="card"><header><h3>Canary avec rollback automatique</h3><div class="meter"><span class="tag twarn">Impact moyen</span><span class="tag t3">Effort M</span></div></header>
+      <p>La CI envoie 10 % du trafic à la nouvelle révision, observe le taux d'erreur 5 min, puis passe à 100 % ou revient en arrière. Démo : on pousse volontairement une version buggée.</p></div>
+    <div class="card"><header><h3>Bonus « Platform 2.5 »</h3><div class="meter"><span class="tag twarn">Impact moyen</span><span class="tag t2">Effort L</span></div></header>
+      <p>Une variable Terraform qui fait passer la P2 en colonne « Cloud-Ready » du cours : MIG avec autohealing + Cloud SQL HA. Montre que vous avez compris les trois colonnes, et le chemin de migration réel d'une entreprise.</p></div>
+    <div class="card"><header><h3>Supply chain sécurisée</h3><div class="meter"><span class="tag twarn">Impact moyen</span><span class="tag t3">Effort S</span></div></header>
+      <p>Image distroless, SBOM généré en CI, scan de vulnérabilités dans Artifact Registry. Renforce l'argument « rebuild plutôt que patch ».</p></div>
+    <div class="card"><header><h3>Tableau de bord temps réel des ventes</h3><div class="meter"><span class="tag tok">Effet visuel</span><span class="tag t3">Effort S</span></div></header>
+      <p>Abonnement Pub/Sub vers BigQuery puis Looker Studio : les ventes du test de charge apparaissent en direct. Rend l'architecture orientée événements tangible.</p></div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="plan">
+  <header><span class="sec-num">07</span><h2>Plan de route</h2>
+  <p class="muted" style="max-width:70ch">Calé sur les ~3 suivis. Les dates exactes restent à récupérer.</p></header>
+  <div class="steps">
+    <div class="step"><span class="when">Avant le suivi 1</span><h3>Cadrage et socle</h3><p class="muted">Choix de l'appli et des décisions ci-dessous (une ADR par décision). Comptes et projets GCP, alerte budget, bucket de state, CI avec Workload Identity. Appli qui tourne en local avec <code>docker compose</code>.</p></div>
+    <div class="step"><span class="when">Suivi 1</span><h3>Platform 2 debout</h3><p class="muted">VPC et subnets, VM, load balancer, PostgreSQL primaire + réplique, Ansible, Zabbix, cron. Premier billet vendu en P2. Runbook de bascule DB écrit.</p></div>
+    <div class="step"><span class="when">Suivi 2</span><h3>Platform 3 debout</h3><p class="muted">Cloud Run sur 2 régions, load balancer global, Firestore, Pub/Sub + worker, bucket, pipeline CI/CD avec canary, OpenTelemetry et SLO.</p></div>
+    <div class="step"><span class="when">Suivi 3</span><h3>Campagne de tests</h3><p class="muted">Protocole T1 à T8 sur les deux plateformes, tableau de scores rempli, bonus choisis, répétition de la démo de chaos.</p></div>
+    <div class="step"><span class="when">Soutenance</span><h3>Récit et démo</h3><p class="muted">Fil conseillé : le besoin → la P2 telle qu'en 2010 → ses limites mesurées → la P3 → les mêmes tests → le tableau de scores → ce qu'une entreprise ferait (la P2 ne disparaît pas, elle cohabite).</p></div>
+  </div>
+  <div class="card">
+    <h3>Répartition type pour 4 personnes</h3>
+    <div class="grid2" style="gap:10px">
+      <p><strong>Infra P2</strong> : Terraform P2, Ansible, PostgreSQL, runbooks</p>
+      <p><strong>Infra P3</strong> : Terraform P3, load balancer global, Firestore, Pub/Sub</p>
+      <p><strong>Appli et CI/CD</strong> : API, worker, front, pipelines, canary</p>
+      <p><strong>Ops et tests</strong> : monitoring P2, observabilité P3, k6, chaos, tableau de scores</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section id="budget">
+  <header><span class="sec-num">08</span><h2>Budget GCP</h2>
+  <p class="muted" style="max-width:70ch">Ordres de grandeur pour des machines de petite taille en Europe, à recalculer avec le simulateur GCP ou Infracost avant de lancer quoi que ce soit.</p></header>
+  <div class="tbl">
+    <table style="min-width:600px">
+      <thead><tr><th>Poste</th><th class="h2c">P2, allumée 24/7</th><th class="h3c">P3, allumée 24/7</th></tr></thead>
+      <tbody class="num">
+        <tr><td>Compute</td><td class="c2">~9 VM e2-micro / e2-small : 60 à 110 $/mois</td><td class="c3">Cloud Run : quasi nul hors tests (offre gratuite mensuelle)</td></tr>
+        <tr><td>Load balancer</td><td class="c2">~20 $/mois</td><td class="c3">~20 $/mois + Cloud Armor quelques $</td></tr>
+        <tr><td>Données</td><td class="c2">Disques et snapshots : ~10 $/mois</td><td class="c3">Firestore, Pub/Sub, GCS : dans l'offre gratuite à faible trafic</td></tr>
+        <tr><td><strong>Total indicatif</strong></td><td class="c2"><strong>~100 à 150 $/mois</strong></td><td class="c3"><strong>~30 à 50 $/mois</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Pour rester à presque 0 €</h3><ul class="tight"><li><code>terraform destroy</code> de la P2 en fin de séance : la P2 coûte alors quelques dollars par jour d'usage</li><li>Alerte budget à 10, 25 et 50 $ dès le bootstrap</li><li>Labels <code>platform=p2|p3</code> sur toutes les ressources</li></ul></div>
+    <div class="card"><h3>Crédits</h3><ul class="tight"><li>Essai gratuit GCP pour un nouveau compte (historiquement 300 $ sur 90 jours, à vérifier au moment de l'inscription)</li><li>Crédits Google Cloud for Education : demande à faire par l'enseignant pour la classe</li></ul></div>
+  </div>
+  <p class="muted" style="font-size:.9rem">L'écart de coût est un argument en soi : la P2 paie sa redondance en permanence, la P3 paie à l'usage. Mettez la facture réelle dans le tableau de scores.</p>
+</section>
+
+<!-- 9 -->
+<section id="decisions">
+  <header><span class="sec-num">09</span><h2>Décisions à prendre</h2>
+  <p class="muted" style="max-width:70ch">Cochez vos choix : la recommandation est pré-sélectionnée. Le récapitulatif se copie pour le coller dans votre conversation d'équipe ou une ADR. Vos choix restent mémorisés dans ce navigateur.</p></header>
+  <div class="declay">
+    <div class="dec" id="dec"></div>
+    <aside class="card summary">
+      <h3>Récapitulatif</h3>
+      <pre id="recap"></pre>
+      <div class="row">
+        <button class="btn" id="copy" type="button">Copier</button>
+        <button class="btn ghost" id="reset" type="button">Revenir aux recommandations</button>
+      </div>
+      <span id="copymsg" class="muted" style="font-size:.85rem" aria-live="polite"></span>
+    </aside>
+  </div>
+
+  <div class="card">
+    <h3>Questions à poser au prof au premier suivi</h3>
+    <ol class="tight">
+      <li>GCP est-il accepté ? Les exemples du cours sont sur AWS et on n'a plus de cluster on-prem.</li>
+      <li>L'application est-elle imposée, ou libre ? Doit-elle être strictement la même dans les deux plateformes ?</li>
+      <li>En P2, un load balancer managé du cloud est-il accepté, ou faut-il un LB en VM (HAProxy) ?</li>
+      <li>En P2, « résiliente » veut-elle dire dual-zone, ou le mono-zone du tableau du Cours 1 suffit ?</li>
+      <li>Le livrable inclut-il la configuration logicielle (Ansible, cloud-init) ou seulement le Terraform ?</li>
+      <li>Une démo live est-elle attendue en soutenance ? Quels sont les critères de notation ?</li>
+      <li>Dates des suivis et taille des équipes.</li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  <p>Sources : les 4 supports du cours « Génération Architecture » (Y. Neff) : Cours 1 & TD 1, Cours 2 Platform 2 Infra, Cours 3 Platform 2 Middleware, Cours 4 Platform 3 Architecture & Production. Pour GCP : <a href="https://docs.cloud.google.com/run/docs/multiple-regions" target="_blank" rel="noopener">Cloud Run, servir le trafic depuis plusieurs régions</a>, <a href="https://cloud.google.com/sql/pricing" target="_blank" rel="noopener">tarifs Cloud SQL</a>, <a href="https://cloud.google.com/edu/faculty" target="_blank" rel="noopener">Google Cloud for Faculty</a>.</p>
+  <p>Les montants et durées sont des estimations à valider ; les tarifs GCP évoluent.</p>
+</footer>
+</div>
+
+<script>
+const DECISIONS = [
+  {id:"app", q:"Quelle application ?", why:"Elle doit rendre visibles pic de charge, transaction, fichier et asynchrone.",
+   opts:[["billet","Billetterie d'événement","Pic à l'ouverture, stock transactionnel, QR asynchrone",true],["photo","Partage de photos","Très bon pour stockage et événements, faible sur les transactions"],["salle","Réservation de salles","Simple, mais démo plate"]]},
+  {id:"p2ha", q:"Niveau de résilience de la P2 ?", why:"Le tableau du cours dit mono-AZ, mais le TD demande une appli résiliente.",
+   opts:[["dual","Deux zones d'une région (« 2 DC campus »)","Redondance infra crédible, bascule DB manuelle",true],["mono","Une seule zone","Fidèle au tableau, mais résilience faible"]]},
+  {id:"p3compute", q:"Compute de la P3 ?", why:"Les deux sont P3. Cloud Run est plus simple et moins cher ; GKE colle à la slide Kubernetes.",
+   opts:[["run","Cloud Run multi-région","Serverless, scale à zéro, bascule auto entre régions",true],["gke","GKE Autopilot","Montre l'orchestration Kubernetes, plus coûteux et plus long à monter"]]},
+  {id:"p3data", q:"Base de données de la P3 ?", why:"Le cours associe NoSQL et DBaaS à la P3.",
+   opts:[["fs","Firestore multi-région eur3","NoSQL managé, quasi gratuit, RPO ≈ 0, demande un 2e adaptateur",true],["sql","Cloud SQL PostgreSQL HA + réplique","Même SQL qu'en P2, mais ~100 $/mois et bascule régionale moins fluide"]]},
+  {id:"p2mon", q:"Monitoring de la P2 ?", why:"Pour être fidèle à l'époque, l'outil compte autant que les alertes.",
+   opts:[["zabbix","Zabbix sur une VM","Outil d'époque cité dans le cours, agents push/pull",true],["cm","Cloud Monitoring + Ops Agent","Plus rapide à monter, moins typé P2"]]},
+  {id:"p2lb", q:"Load balancer de la P2 ?", why:"Le LB est un équipement P2 dans le cours ; reste à savoir s'il peut être managé.",
+   opts:[["managed","LB régional managé GCP","Simple et fiable, à valider avec le prof",true],["haproxy","HAProxy sur 2 VM","Plus « datacenter », mais l'IP flottante est délicate sur GCP"]]},
+  {id:"lang", q:"Langage de l'appli ?", why:"Choisissez ce que l'équipe maîtrise le mieux.",
+   opts:[["py","Python FastAPI","Rapide à écrire, bons SDK GCP",true],["node","Node.js / TypeScript","Idem, si l'équipe est plus JS"],["java","Java Spring Boot","Très « serveur d'application » en P2, démarrage à froid plus lent en P3"]]},
+  {id:"bonus25", q:"Faire le bonus Platform 2.5 ?", why:"Montre la colonne intermédiaire « Cloud-Ready » du cours.",
+   opts:[["non","Non, seulement si le temps le permet","Priorité aux deux livrables et au protocole",true],["oui","Oui","Fort effet en soutenance, effort important"]]}
+];
+const KEY="genarchi-decisions-v1";
+let state={};
+try{ state=JSON.parse(localStorage.getItem(KEY)||"{}")||{}; }catch(e){ state={}; }
+function defaults(){ const s={}; DECISIONS.forEach(d=>{ const r=d.opts.find(o=>o[3]); s[d.id]=r?r[0]:d.opts[0][0]; }); return s; }
+state=Object.assign(defaults(),state);
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
+const root=document.getElementById("dec");
+function render(){
+  root.innerHTML="";
+  DECISIONS.forEach((d,i)=>{
+    const c=document.createElement("div"); c.className="dcard";
+    c.innerHTML=`<span class="eyebrow">D${i+1}</span><h3>${d.q}</h3><p class="why">${d.why}</p>`;
+    const o=document.createElement("div"); o.className="opts"; o.setAttribute("role","radiogroup");
+    d.opts.forEach(([v,l,s,rec])=>{
+      const id=`d-${d.id}-${v}`;
+      const lab=document.createElement("label"); lab.className="opt"+(state[d.id]===v?" on":""); lab.htmlFor=id;
+      lab.innerHTML=`<input type="radio" name="d-${d.id}" id="${id}" value="${v}" ${state[d.id]===v?"checked":""}><span class="lbl"><span>${l} ${rec?'<span class="tag tok">recommandé</span>':''}</span><small>${s}</small></span>`;
+      lab.querySelector("input").addEventListener("change",()=>{ state[d.id]=v; save(); render(); });
+      o.appendChild(lab);
+    });
+    c.appendChild(o); root.appendChild(c);
+  });
+  recap();
+}
+function recap(){
+  const lines=["Projet Gen Archi : nos choix",""];
+  DECISIONS.forEach((d,i)=>{ const o=d.opts.find(x=>x[0]===state[d.id]); lines.push(`D${i+1}. ${d.q}\n    → ${o?o[1]:"?"}`); });
+  document.getElementById("recap").textContent=lines.join("\n");
+}
+document.getElementById("copy").addEventListener("click",()=>{
+  const t=document.getElementById("recap").textContent, m=document.getElementById("copymsg");
+  try{
+    navigator.clipboard.writeText(t).then(()=>{m.textContent="Copié.";},()=>{selectRecap();m.textContent="Texte sélectionné : copiez-le avec Ctrl+C.";});
+  }catch(e){ selectRecap(); m.textContent="Texte sélectionné : copiez-le avec Ctrl+C."; }
+});
+function selectRecap(){ const r=document.createRange(); r.selectNodeContents(document.getElementById("recap")); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }
+document.getElementById("reset").addEventListener("click",()=>{ state=defaults(); save(); render(); document.getElementById("copymsg").textContent=""; });
+render();
+</script>

@@ -1,0 +1,63 @@
+# Frontière P2 / P3 exprimée en types de ressources Terraform interdits.
+# Vérifiée par scripts/check_boundary.py (à brancher en CI).
+# Motifs fnmatch sur le type de ressource ou de data source (ex. "google_sql_*").
+# Toute exception doit être justifiée dans une ADR et ajoutée à `allow` avec un commentaire.
+
+contract_version = "0.1.0"
+
+[platform2]
+path = "infra/p2"
+reason = "Platform 2 = datacenter virtuel : VM, bloc, NAS, redondance infra, pas de managé ni d'autoscaling."
+deny = [
+  # Containers et serverless (= P3)
+  "google_cloud_run_*",
+  "google_cloudfunctions*",
+  "google_container_*",
+  "google_artifact_registry_*",
+  # Données managées / DBaaS / NoSQL (= Cloud-Ready ou P3)
+  "google_sql_*",
+  "google_alloydb_*",
+  "google_firestore_*",
+  "google_spanner_*",
+  "google_bigtable_*",
+  "google_redis_*",
+  "google_memcache_*",
+  # Stockage objet pour les données de l'app (= P3)
+  "google_storage_bucket",
+  "google_storage_bucket_object",
+  # Événements (= P3)
+  "google_pubsub_*",
+  "google_eventarc_*",
+  "google_cloud_scheduler_job",
+  # Autoscaling / autohealing (= colonne Cloud-Ready)
+  "google_compute_instance_group_manager",
+  "google_compute_region_instance_group_manager",
+  "google_compute_autoscaler",
+  "google_compute_region_autoscaler",
+  # Load balancing global anycast (= P3)
+  "google_compute_global_forwarding_rule",
+  "google_compute_target_https_proxy",
+  "google_compute_target_http_proxy",
+  "google_compute_url_map",
+  "google_compute_backend_service",
+]
+allow = []
+
+[platform3]
+path = "infra/p3"
+reason = "Platform 3 = born to be cloud : pas de VM, pas de disque, pas de NAS, pas d'état local."
+deny = [
+  "google_compute_instance",
+  "google_compute_instance_template",
+  "google_compute_region_instance_template",
+  "google_compute_instance_group",
+  "google_compute_instance_group_manager",
+  "google_compute_region_instance_group_manager",
+  "google_compute_disk",
+  "google_compute_region_disk",
+  "google_compute_attached_disk",
+  "google_compute_resource_policy",
+  "google_filestore_*",
+  "google_service_account_key",
+]
+allow = []

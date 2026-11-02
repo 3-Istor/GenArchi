@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://genarchi.invalid/contracts/events/ticket-issued.v1.schema.json",
+  "title": "fr.genarchi.ticket.issued.v1 — data",
+  "description": "Payload `data` du CloudEvent émis par le worker une fois le QR d'un billet écrit.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["ticket_id", "order_id", "event_id", "qr_object", "issued_at"],
+  "properties": {
+    "ticket_id": { "type": "string", "minLength": 1 },
+    "order_id": { "type": "string", "minLength": 1 },
+    "event_id": { "type": "string", "minLength": 1 },
+    "qr_object": {
+      "type": "string",
+      "pattern": "^tickets/[^/]+/[^/]+\\.png$",
+      "description": "Clé déterministe tickets/{event_id}/{ticket_id}.png"
+    },
+    "issued_at": { "type": "string", "format": "date-time" }
+  }
+}
