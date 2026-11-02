@@ -1,0 +1,46 @@
+# Système et éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+~$*
+
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+.aws/
+credentials.json
+secrets/
+*.local
+*.local.*
+
+# Terraform : conserver les fichiers .terraform.lock.hcl
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Fichiers temporaires et journaux locaux
+*.tmp
+*.bak
+*.log
+.cache/
