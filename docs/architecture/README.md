@@ -33,3 +33,4 @@ Ordre de travail proposé :
 - Sens des flèches : de celui qui ouvre la connexion vers celui qui écoute.
 - Étapes numérotées = chemin de la requête ; lettres = arrière-plan.
 - Les flux interdits sont listés dans chaque spec (`denied: true` + `enforced_by`).
+- P2 : vue `p2-topology` dans [`architecture/p2/`](../../architecture/p2/), rendue en mode clair dans [`architecture/diagrams/`](../../architecture/diagrams/). Icônes du projet dans `.noodle/icons/` (simple-icons 13.21.0, recolorées aux couleurs des marques).

@@ -1,0 +1,52 @@
+apiVersion: noodle/v1alpha1
+kind: View
+type: topology
+title: "GenArchi · Plateforme 2 · Datacenter virtuel sur GCP"
+subtitle: "Comment un achat traverse le datacenter virtuel, et qu’est-ce qui le protège ?"
+meta:
+  - "Périmètre : P2, europe-west9, zone a = DC 1, zone b = DC 2 · spec docs/architecture/platform2.md + arbitrages P2 du 2026-11-03"
+  - "Hors périmètre : construction (Terraform, Ansible) · flux interdits (vue p2-network) · bascule pas à pas (vue p2-db-failover)"
+  - "v0.1 · proposition, ADR au statut proposé · aucun déploiement réalisé · source : architecture/p2"
+
+steps: [c-user-lb, c-lb-web01, c-web01-app01, c-app01-db01]
+background: [c-batch-db, c-batch-nfs, c-db02-db01, c-mon-discord, c-op-bastion]
+
+# Short corridors: keep the badge only, the cards carry the text.
+labels:
+  c-web01-app01: ""
+  c-web02-app02: ""
+  c-app01-db01: ""
+  c-app02-db01: ""
+  c-batch-db: ""
+  c-batch-nfs: ""
+  c-db02-db01: ""
+
+cards:
+  - {id: card-legend, title: "Légende", color: slate, legend: true}
+  - id: card-data-plane
+    title: "Achat · data plane"
+    color: cyan
+    lines:
+      - "[1] L’acheteur poste sa commande au load balancer régional."
+      - "[2] Le LB choisit un nginx sain (health check /readyz)."
+      - "[3] nginx relaie vers app-01 ou app-02 : son upstream contient les deux."
+      - "[4] Transaction SQL sur la primaire, jointe par db-primary.p2.genarchi.internal."
+      - "web-02 et app-02 (DC 2) suivent le même chemin. L’app est sans état."
+  - id: card-control-plane
+    title: "Arrière-plan · control plane"
+    color: violet
+    lines:
+      - "[A] [B] batch-01 émet les QR toutes les 15 min, lance pg_dump à 02:00 et l’export CSV à 03:00."
+      - "[C] db-02 ouvre la réplication asynchrone vers db-01."
+      - "[D] Zabbix poste ses alertes sur un webhook Discord, via Cloud NAT."
+      - "[E] L’opérateur rejoint le bastion par un tunnel IAP, puis rebondit en SSH."
+      - "Non dessinés : agents Zabbix (10050) sur chaque VM, rebond SSH vers toutes les VM, snapshots quotidiens des disques db et nfs."
+  - id: card-pannes
+    title: "Pannes et reprise"
+    color: orange
+    lines:
+      - "**web ou app perdu** : retiré du LB en ~10 s, relance manuelle."
+      - "**db-01 perdu** : runbook (fencing, promotion de db-02, DNS repointé). Cibles RTO ≤ 30 min, RPO ≤ 5 min."
+      - "**Zone a perdue** : runbook DR manuel, db-02 promue, nfs recréé depuis snapshot."
+      - "SPOF assumés : nfs-01, batch-01, mon-01."
+      - "!!À confirmer au coaching!! GCP, deux zones avec bascule manuelle, cibles RTO/RPO."

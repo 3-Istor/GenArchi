@@ -4,7 +4,7 @@
 - Date de proposition : 2026-11-02
 - Auteur(s) : tech leads (noms à confirmer, Q-008)
 - Questions concernées : [Q-002](../cadrage.md#registre-des-questions-ouvertes), [Q-003](../cadrage.md#registre-des-questions-ouvertes)
-- Validation : à confirmer (date, validateurs et lien vers CR/restitution)
+- Validation : à confirmer ; avis favorable du chantier P2 le 2026-11-03 ([CR](../comptes-rendus/2026-11-03-seance-p2.md)), validation de l’équipe à venir
 - Remplace / remplacée par : sans objet
 
 ## Contexte

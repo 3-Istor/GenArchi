@@ -1,0 +1,54 @@
+apiVersion: noodle/v1alpha1
+kind: Model
+
+# P2 "virtual datacenter" from docs/architecture/platform2.md (PR #1) and the P2 choices of 2026-11-03.
+# Proposal only (ADRs at status "proposé"); nothing is deployed.
+
+elements:
+  - {id: p2-internet, kind: region, color: slate, icon: globe, title: "INTERNET"}
+  - {id: p2-gcp, kind: region, color: sky, icon: gcp, title: "GCP PROJECT GENARCHI-P2", sub: "europe-west9 (Paris)"}
+  - {id: p2-saas, kind: region, color: orange, icon: discord, title: "SAAS"}
+  - {id: p2-edge, kind: group, parent: p2-gcp, color: amber, icon: gcp, title: "NETWORK EDGE", sub: "équipements managés"}
+  - {id: p2-svc, kind: group, parent: p2-gcp, color: indigo, icon: gcp, title: "IP SERVICES", sub: "Cloud DNS privé"}
+  - {id: p2-vpc, kind: region, parent: p2-gcp, color: cyan, icon: gcp, title: "VPC P2-VPC", sub: "10.20.0.0/16 · firewall par plage d’IP · aucune IP publique"}
+  - {id: p2-dc1, kind: region, parent: p2-vpc, color: emerald, icon: rack, title: "DC 1", sub: "zone europe-west9-a"}
+  - {id: p2-dc2, kind: region, parent: p2-vpc, color: violet, icon: rack, title: "DC 2", sub: "zone europe-west9-b"}
+
+  - {id: p2-operator, kind: external, parent: p2-internet, shape: actor, icon: user, title: "Opérateur (N2)", desc: "exécute les runbooks"}
+  - {id: p2-user, kind: external, parent: p2-internet, shape: actor, icon: user, title: "Acheteur", desc: "navigateur"}
+
+  - {id: p2-lb, kind: cloud, parent: p2-edge, icon: gcp, title: "Load balancer régional", tech: "[Application LB externe]", desc: "Health check /readyz", ports: [{name: http, protocol: TCP, port: 80}]}
+  - {id: p2-nat, kind: cloud, parent: p2-edge, icon: gcp, title: "Cloud NAT", tech: "[passerelle internet]", desc: "Sortie : apt, alertes"}
+  - {id: p2-dns, kind: cloud, parent: p2-svc, icon: gcp, title: "DNS privé", tech: "[Cloud DNS · zone privée]", desc: "db-primary → db-01"}
+
+  - {id: p2-web-01, kind: frontend, parent: p2-dc1, icon: nginx, title: "web-01", tech: "[nginx · Debian 12]", desc: "front · 10.20.1.11", ports: [{name: http, protocol: TCP, port: 80}]}
+  - {id: p2-app-01, kind: backend, parent: p2-dc1, icon: fastapi, title: "app-01", tech: "[API Python · systemd]", desc: "app · 10.20.2.11", ports: [{name: api, protocol: TCP, port: 8080}]}
+  - {id: p2-db-01, kind: database, parent: p2-dc1, shape: cylinder, icon: postgresql, title: "db-01", tech: "[PostgreSQL 15 · primaire]", desc: "data · 10.20.3.11", ports: [{name: pg, protocol: TCP, port: 5432}]}
+  - {id: p2-nfs-01, kind: database, parent: p2-dc1, shape: cylinder, icon: debian, title: "nfs-01", tech: "[NFS v4 · QR et exports]", desc: "data · 10.20.3.21", ports: [{name: nfs, protocol: TCP, port: 2049}]}
+  - {id: p2-bastion, kind: security, parent: p2-dc1, icon: debian, title: "bastion", tech: "[OpenSSH · Debian 12]", desc: "admin · 10.20.9.10", ports: [{name: ssh, protocol: TCP, port: 22}]}
+  - {id: p2-mon-01, kind: tool, parent: p2-dc1, icon: debian, title: "mon-01", tech: "[Zabbix 7 server]", desc: "admin · 10.20.9.11"}
+
+  - {id: p2-web-02, kind: frontend, parent: p2-dc2, icon: nginx, title: "web-02", tech: "[nginx · Debian 12]", desc: "front · 10.20.1.12", ports: [{name: http, protocol: TCP, port: 80}]}
+  - {id: p2-app-02, kind: backend, parent: p2-dc2, icon: fastapi, title: "app-02", tech: "[API Python · systemd]", desc: "app · 10.20.2.12", ports: [{name: api, protocol: TCP, port: 8080}]}
+  - {id: p2-batch-01, kind: backend, parent: p2-dc2, icon: python, title: "batch-01", tech: "[timers systemd]", desc: "app · 10.20.2.21"}
+  - {id: p2-db-02, kind: database, parent: p2-dc2, shape: cylinder, icon: postgresql, title: "db-02", tech: "[PostgreSQL 15 · réplique]", desc: "data · 10.20.3.12"}
+
+  - {id: p2-discord, kind: external, parent: p2-saas, icon: discord, title: "Discord", tech: "[webhook]", desc: "Canal d’alertes", ports: [{name: https, protocol: TCP, port: 443}]}
+
+connections:
+  # Purchase path.
+  - {id: c-user-lb, from: p2-user, to: p2-lb, port: http, protocol: HTTP, verb: buy, kind: flow}
+  - {id: c-lb-web01, from: p2-lb, to: p2-web-01, port: http, protocol: HTTP, verb: proxy, kind: flow}
+  - {id: c-web01-app01, from: p2-web-01, to: p2-app-01, port: api, protocol: HTTP, verb: proxy, kind: flow}
+  - {id: c-app01-db01, from: p2-app-01, to: p2-db-01, port: pg, protocol: PostgreSQL, verb: transaction, kind: flow}
+  # Same path through DC 2. nginx upstreams both app servers; the cross links are in the card.
+  - {id: c-lb-web02, from: p2-lb, to: p2-web-02, port: http, protocol: HTTP, verb: proxy, kind: flow}
+  - {id: c-web02-app02, from: p2-web-02, to: p2-app-02, port: api, protocol: HTTP, verb: proxy, kind: flow}
+  - {id: c-app02-db01, from: p2-app-02, to: p2-db-01, port: pg, protocol: PostgreSQL, verb: transaction, kind: flow}
+
+  # Background work. The standby opens the replication connection to the primary.
+  - {id: c-batch-db, from: p2-batch-01, to: p2-db-01, port: pg, protocol: PostgreSQL, verb: "pending, pg_dump", kind: async}
+  - {id: c-batch-nfs, from: p2-batch-01, to: p2-nfs-01, port: nfs, protocol: NFS, verb: "write QR, CSV", kind: async}
+  - {id: c-db02-db01, from: p2-db-02, to: p2-db-01, port: pg, protocol: réplication, verb: stream WAL, kind: async}
+  - {id: c-mon-discord, from: p2-mon-01, to: p2-discord, port: https, protocol: HTTPS, verb: alert, kind: async}
+  - {id: c-op-bastion, from: p2-operator, to: p2-bastion, port: ssh, protocol: SSH, verb: tunnel IAP, kind: flow}
