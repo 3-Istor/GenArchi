@@ -1,6 +1,6 @@
 # Décisions d’architecture
 
-**Aucune ADR n’est acceptée au 2 novembre 2026.** Les ADR 0001 à 0013 sont des propositions des tech leads, à valider. Les exemples du kickoff ne valent pas décision.
+**Aucune ADR n’est acceptée au 2 novembre 2026.** Les ADR 0001 à 0013 sont des propositions des tech leads, à valider. Le chantier P2 a donné un avis favorable aux ADR 0002, 0006, 0009, 0010 et 0012 le 3 novembre ; l’ADR 0012 envoie désormais les alertes sur Discord ([CR](../comptes-rendus/2026-11-03-seance-p2.md)). Les exemples du kickoff ne valent pas décision.
 
 ## Créer et faire évoluer une ADR
 

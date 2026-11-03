@@ -23,7 +23,9 @@ Toutes les propositions ci-dessous sont non validées. Porteurs : à confirmer.
 
 ## Éléments à apporter
 
-- Les deux pistes d’architecture du [kickoff, diapositives 4–5](../references/originaux/kickoff.pptx), à annoter comme propositions. Aucun nouveau schéma détaillé n’est encore produit.
+Le [support de présentation](2026-11-03-coaching-1.pptx) est disponible. La diapositive 4 présente l’architecture P2 proposée par le chantier P2 et ses questions ([CR](../comptes-rendus/2026-11-03-seance-p2.md)) ; les diapositives 3 et 5 ne conservent que leur titre pour d’autres schémas P2 et P3. La diapositive 2 présente notre compréhension à confirmer sous forme de deux schémas inspirés du kickoff ; la diapositive 6 regroupe les questions en une seule liste. Les notes du présentateur contiennent les références et les précisions orales.
+
+- Les deux pistes d’architecture du [kickoff, diapositives 4–5](../references/originaux/kickoff.pptx), à annoter comme propositions. Le schéma P2 détaillé est produit (diapositive 4) ; le schéma P3 reste à fournir.
 - L’inventaire des accès disponibles, des quotas et du budget : **à constituer**, sans secrets dans le dépôt.
 - Les affectations PM, Tech Leads P2/P3 et appuis transverses : **à confirmer** (Q-008).
 - L’état réel : documentation initiale uniquement, aucun déploiement ni test exécuté.

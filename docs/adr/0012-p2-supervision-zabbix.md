@@ -4,7 +4,7 @@
 - Date de proposition : 2026-11-02
 - Auteur(s) : tech leads (noms à confirmer, Q-008)
 - Questions concernées : [Q-002](../cadrage.md#registre-des-questions-ouvertes), [Q-010](../cadrage.md#registre-des-questions-ouvertes)
-- Validation : à confirmer (date, validateurs et lien vers CR/restitution)
+- Validation : à confirmer ; avis favorable du chantier P2 le 2026-11-03 ([CR](../comptes-rendus/2026-11-03-seance-p2.md)), validation de l’équipe à venir
 - Remplace / remplacée par : sans objet
 
 ## Contexte
@@ -20,7 +20,7 @@ La supervision fait partie de la génération : [cours 4, diapositives 23–25](
 
 ## Décision proposée
 
-Zabbix 7 sur `mon-01`, agents sur toutes les VM, alertes par mail, traitement humain.
+Zabbix 7 sur `mon-01`, agents sur toutes les VM, alertes envoyées sur un webhook Discord (URL secrète, hors dépôt), traitement humain. Modifié le 2026-11-03 : le mail est remplacé par Discord ([CR](../comptes-rendus/2026-11-03-seance-p2.md)).
 
 Ce choix n'est pas accepté tant que l'équipe ne l'a pas validé explicitement.
 

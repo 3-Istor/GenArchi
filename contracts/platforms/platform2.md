@@ -56,7 +56,7 @@ Autorisé et attendu : VM nommées, disques persistants, VPC custom avec sous-r�
 | `os_image` | string | `debian-cloud/debian-12` | Image de base |
 | `db_disk_size_gb` | number | `20` | Disque de données PostgreSQL |
 | `admin_members` | list(string) | — | Comptes autorisés en SSH via IAP sur le bastion |
-| `alert_email` | string | — | Destinataire des alertes Zabbix |
+| `alert_webhook_url` | string (sensible) | — | Webhook Discord des alertes Zabbix, fourni hors dépôt |
 | `labels` | map(string) | `{ platform = "p2", project = "genarchi" }` | Appliqués partout |
 
 ### Sorties

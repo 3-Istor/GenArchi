@@ -22,6 +22,7 @@ Construit par Terraform (livrable imposé) + Ansible (installation initiale). **
 | `p2-dc2` | region | DC 2 | zone europe-west9-b | VM de la zone b |
 | `p2-svc` | group | IP SERVICES | Cloud DNS privé | `p2-dns` |
 | `p2-tooling` | group | BUILD | hors run | `p2-terraform`, `p2-ansible` |
+| `p2-saas` | region | SAAS | — | `p2-discord` |
 
 ## 3. Plan réseau
 
@@ -72,13 +73,14 @@ Flux explicitement interdits à dessiner (`denied: true`, `enforced_by: p2-firew
 | `p2-db-01` | db-01 | PostgreSQL 15 · primaire | database (cylinder) | DC 1 | data · 10.20.3.11 | e2-medium + disque 20 Go | `pg` TCP 5432 | Base primaire |
 | `p2-db-02` | db-02 | PostgreSQL 15 · réplique | database (cylinder) | DC 2 | data · 10.20.3.12 | e2-medium + disque 20 Go | `pg` TCP 5432 | Réplique streaming asynchrone, lecture seule |
 | `p2-nfs-01` | nfs-01 | NFS v4 · Debian 12 | database (cylinder) | DC 1 | data · 10.20.3.21 | e2-small + disque 20 Go | `nfs` TCP 2049 | Partage `/srv/tickets` (QR) et `/srv/exports` (CSV) |
-| `p2-mon-01` | mon-01 | Zabbix 7 server + PostgreSQL local | tool | DC 1 | admin · 10.20.9.11 | e2-medium | `zbx-trapper` TCP 10051 | Supervision, alertes mail |
+| `p2-mon-01` | mon-01 | Zabbix 7 server + PostgreSQL local | tool | DC 1 | admin · 10.20.9.11 | e2-medium | `zbx-trapper` TCP 10051 | Supervision, alertes sur webhook Discord |
 | `p2-bastion` | bastion | OpenSSH · Debian 12 | security | DC 1 | admin · 10.20.9.10 | e2-micro | `ssh` TCP 22 | Seul point d'entrée d'administration |
 | `p2-dns` | Zone privée `p2.genarchi.internal` | Cloud DNS | cloud | IP services | — | managé | — | `db-primary` → IP de la base primaire, `nfs` → nfs-01 |
 | `p2-firewall` | Règles firewall VPC | VPC firewall | security | VPC | — | — | — | Applique la matrice de flux |
 | `p2-snapshots` | Snapshots planifiés | resource policy | tool | gcp | — | — | — | Snapshots quotidiens des disques `db-*` et `nfs-01`, rétention 7 j |
 | `p2-terraform` | Terraform | `infra/p2` | tool | build | — | — | — | Construit le DC |
 | `p2-ansible` | Ansible | `infra/p2/ansible` | tool | build | — | — | — | Installe et configure (via bastion) |
+| `p2-discord` | Discord | webhook | external | saas | — | managé | `https` TCP 443 | Canal d’alertes de l’équipe |
 
 Agents Zabbix (`zbx-agent` TCP 10050) sur chaque VM : à dessiner comme port des VM, pas comme boîte.
 
@@ -101,6 +103,7 @@ Sens = celui qui ouvre la connexion → celui qui écoute (règle Noodle).
 | `c-op-bastion` | `p2-operator` | `p2-bastion` | ssh | admin · SSH via IAP | flow |
 | `c-bastion-vms` | `p2-bastion` | toutes les VM | ssh | admin · SSH | flow |
 | `c-vms-nat` | toutes les VM | `p2-nat` | — | apt · HTTPS | async |
+| `c-mon-discord` | `p2-mon-01` | `p2-discord` | https | alert · HTTPS via Cloud NAT | async |
 | `c-web-db-denied` | `p2-web-0x` | `p2-db-01` | pg | — | flow, **denied**, `enforced_by: p2-firewall` |
 
 Références (configuration, pas du trafic) : `p2-app-0x` → `p2-dns` (résout `db-primary`) ; `p2-snapshots` → disques `db-*`, `nfs-01` ; `p2-ansible` → toutes les VM (config) ; `/etc/genarchi/genarchi.env` (`envFrom`).
@@ -125,7 +128,7 @@ Note sur `p2-db-01` : « En cas de panne : runbook `p2-db-failover`, bascule man
 
 ### Vue `p2-db-failover` (sequence) — « Que fait l'opérateur quand db-01 tombe ? »
 
-1. Zabbix détecte `db-01` injoignable → mail à l'astreinte
+1. Zabbix détecte `db-01` injoignable → alerte sur le webhook Discord de l'astreinte
 2. L'opérateur ouvre un ticket incident, se connecte au bastion (IAP)
 3. Vérifie que `db-01` est bien mort (éviter le split-brain) et l'arrête
 4. `pg_ctl promote` sur `db-02`

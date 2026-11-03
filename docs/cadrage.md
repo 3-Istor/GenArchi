@@ -68,9 +68,12 @@ Au 2 novembre 2026, les tech leads proposent, pour validation interne puis au co
 - Des [contrats](../contracts/README.md) v0.1 : API, modèle de domaine, événements, contrat d'exécution, engagements de chaque plateforme et critères d'acceptation. Ils serviront au développement de l'application et à la préparation des tests une fois validés.
 - Des [specs d'architecture](architecture/README.md) P2 et P3, à transformer ensuite en schémas, et un [challenge](architecture/challenge.md) de la frontière P2/P3 et du choix serverless.
 - Les [ADR 0001 à 0013](adr/README.md), toutes au statut **proposé**.
+- Le 3 novembre, le chantier P2 a repris la spec P2 avec une modification (alertes Zabbix sur Discord) et précisé ses questions pour le coaching : [CR](comptes-rendus/2026-11-03-seance-p2.md).
 
 **Contradiction à arbitrer (Q-004)** : ces propositions supposent Google Cloud ([ADR 0001](adr/0001-fournisseur-gcp.md)), alors que le [kickoff, diapositive 5](references/originaux/kickoff.pptx) cite AWS et OpenStack comme pistes. **Écart avec le kickoff (diapositive 7)** : l'[ADR 0004](adr/0004-p3-drp-permanent-rollback-auto.md) propose de faire passer le test de bascule permanent et le rollback automatique de la P3 du niveau 2 au MVP, car sans eux la P3 relève de la colonne « Cloud-Ready » du [cours 1, diapositive 10](references/originaux/cours-1-td-1.pptx).
 
 ## Décisions et état des livrables
 
 Le [registre ADR](adr/README.md) ne contient aucune décision acceptée. Les modèles et emplacements sont prêts ; application, infrastructures et tests restent à réaliser après validation des choix. La [préparation du premier coaching](coaching/2026-11-03-preparation.md) reprend les questions prioritaires et les propositions à discuter.
+
+Le [support du premier coaching](coaching/2026-11-03-coaching-1.pptx) reprend ces éléments en six diapositives, avec deux exemples de schémas comparatifs inspirés du kickoff, deux pages libres réservées aux schémas P2/P3, l’architecture P2 proposée par le chantier P2 (diapositive 4) et une seule liste de questions. Les questions complémentaires sont détaillées dans la préparation et rattachées aux identifiants existants. Ce support ne consigne aucune validation ni résultat d’exécution.

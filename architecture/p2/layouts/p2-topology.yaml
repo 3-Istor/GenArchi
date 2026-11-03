@@ -1,0 +1,62 @@
+apiVersion: noodle/v1alpha1
+kind: Layout
+canvas: {width: 2480, height: 1530}
+
+lanes:
+  lb-out: {x: 665}
+  app02-db: {x: 1345}
+  batch-db: {x: 1360}
+  batch-nfs: {x: 1380}
+  replication: {x: 1700}
+  iap-top: {y: 250}
+  iap-down: {x: 1715}
+
+elements:
+  p2-internet: {x: 40, y: 220, w: 220, h: 920}
+  p2-gcp: {x: 320, y: 160, w: 1780, h: 1020}
+  p2-saas: {x: 2160, y: 400, w: 280, h: 300}
+  p2-edge: {x: 30, y: 380, w: 280, h: 330}
+  p2-svc: {x: 30, y: 850, w: 280, h: 140}
+  p2-vpc: {x: 370, y: 60, w: 1370, h: 920}
+  p2-dc1: {x: 30, y: 60, w: 1310, h: 380}
+  p2-dc2: {x: 30, y: 500, w: 1310, h: 380}
+
+  p2-operator: {x: 82, y: 140, w: 56, h: 56}
+  p2-user: {x: 82, y: 407, w: 56, h: 56}
+  p2-lb: {x: 20, y: 60, w: 240, h: 110}
+  p2-nat: {x: 20, y: 200, w: 240, h: 100}
+  p2-dns: {x: 20, y: 50, w: 240, h: 80}
+
+  p2-web-01: {x: 30, y: 70, w: 260, h: 100}
+  p2-app-01: {x: 350, y: 70, w: 260, h: 100}
+  p2-db-01: {x: 680, y: 70, w: 260, h: 140}
+  p2-nfs-01: {x: 680, y: 250, w: 260, h: 100}
+  p2-bastion: {x: 1020, y: 70, w: 260, h: 100}
+  p2-mon-01: {x: 1020, y: 230, w: 260, h: 100}
+
+  p2-web-02: {x: 30, y: 70, w: 260, h: 100}
+  p2-app-02: {x: 350, y: 70, w: 260, h: 100}
+  p2-batch-01: {x: 350, y: 230, w: 260, h: 100}
+  p2-db-02: {x: 680, y: 70, w: 260, h: 110}
+
+  p2-discord: {x: 20, y: 110, w: 240, h: 100}
+
+edges:
+  c-user-lb: {from: p2-user.right, to: p2-lb.left}
+  c-lb-web01: {from: p2-lb.right@30px, to: p2-web-01.left, waypoints: [lane:lb-out]}
+  c-lb-web02: {from: p2-lb.right@80px, to: p2-web-02.left, waypoints: [lane:lb-out]}
+  c-web01-app01: {from: p2-web-01.right, to: p2-app-01.left}
+  c-web02-app02: {from: p2-web-02.right, to: p2-app-02.left}
+  c-app01-db01: {from: p2-app-01.right, to: p2-db-01.left@55px}
+  c-app02-db01: {from: p2-app-02.right, to: p2-db-01.left@85px, waypoints: [lane:app02-db]}
+  c-batch-db: {from: p2-batch-01.right@50px, to: p2-db-01.left@115px, waypoints: [lane:batch-db]}
+  c-batch-nfs: {from: p2-batch-01.right@70px, to: p2-nfs-01.left, waypoints: [lane:batch-nfs]}
+  c-db02-db01: {from: p2-db-02.right, to: p2-db-01.right@50px, waypoints: [lane:replication], against_flow: true}
+  c-mon-discord: {from: p2-mon-01.right, to: p2-discord.left}
+  c-op-bastion: {from: p2-operator.right, to: p2-bastion.left, waypoints: [[290, 388], lane:iap-top, lane:iap-down], label_at: [1560, 250]}
+
+cards:
+  card-legend: {x: 40, y: 1240, w: 480, h: 250}
+  card-data-plane: {x: 550, y: 1240, w: 600, h: 250}
+  card-control-plane: {x: 1180, y: 1240, w: 640, h: 250}
+  card-pannes: {x: 1850, y: 1240, w: 590, h: 250}
