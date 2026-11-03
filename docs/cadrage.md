@@ -64,3 +64,5 @@ Conserver les identifiants lors des mises à jour. Toutes les questions ci-desso
 ## Décisions et état des livrables
 
 Le [registre ADR](adr/README.md) est vide. Les modèles et emplacements sont prêts ; application, infrastructures et tests restent à réaliser après validation des choix. La [préparation du premier coaching](coaching/2026-11-03-preparation.md) reprend les questions prioritaires et les propositions à discuter.
+
+Le [support du premier coaching](coaching/2026-11-03-coaching-1.pptx) reprennent ces éléments en cinq diapositives, avec deux exemples de schémas comparatifs inspirés du kickoff, deux pages libres réservées aux futurs schémas P2/P3 et une seule liste de questions. Les questions complémentaires sont détaillées dans la préparation et rattachées aux identifiants existants. Ce support ne consigne aucune validation ni résultat d’exécution.
