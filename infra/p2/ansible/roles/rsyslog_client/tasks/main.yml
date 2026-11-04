@@ -1,0 +1,15 @@
+- name: Installer rsyslog
+  ansible.builtin.apt:
+    name: rsyslog
+    state: present
+
+- name: Envoyer les journaux au serveur central (file disque si le serveur est absent)
+  when: inventory_hostname not in groups['zabbix']
+  ansible.builtin.copy:
+    dest: /etc/rsyslog.d/90-genarchi-forward.conf
+    mode: "0644"
+    content: |
+      *.* action(type="omfwd" target="{{ monitoring_ip }}" port="514" protocol="tcp"
+                 queue.type="LinkedList" queue.filename="genarchi-fwd" queue.maxDiskSpace="256m"
+                 queue.saveOnShutdown="on" action.resumeRetryCount="-1")
+  notify: Redémarrer rsyslog

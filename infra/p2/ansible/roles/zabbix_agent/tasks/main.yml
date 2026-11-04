@@ -1,0 +1,17 @@
+- name: Installer l'agent Zabbix 2
+  ansible.builtin.apt:
+    name: zabbix-agent2
+    state: present
+
+- name: Configurer l'agent (enregistrement automatique auprès du serveur)
+  ansible.builtin.template:
+    src: zabbix_agent2.conf.j2
+    dest: /etc/zabbix/zabbix_agent2.conf
+    mode: "0644"
+  notify: Redémarrer l'agent Zabbix
+
+- name: Démarrer l'agent
+  ansible.builtin.systemd_service:
+    name: zabbix-agent2
+    enabled: true
+    state: started

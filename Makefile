@@ -57,10 +57,16 @@ smoke-local: ## Test de fumée sur les deux piles locales
 	scripts/smoke.sh http://localhost:8080 local-admin-token local-staff-token
 	scripts/smoke.sh http://localhost:8090 local-admin-token local-staff-token
 
+## --- Amorçage (une fois par équipe) -------------------------------------------------------------
+bootstrap: ## Crée le bucket d'état OpenTofu partagé (état local, à lancer une seule fois)
+	@test -n "$(P3_PROJECT)" || { echo "P3_PROJECT manquant : cp infra/p3/env.mk.example infra/p3/env.mk"; exit 1; }
+	$(TOFU) -chdir=infra/bootstrap init -input=false
+	$(TOFU) -chdir=infra/bootstrap apply -var project_id=$(P3_PROJECT) -var bucket_name=$(TF_STATE_BUCKET)
+
 ## --- Platform 3 (GCP) ----------------------------------------------------------------------------
 include infra/p3/p3.mk
 
 ## --- Platform 2 (GCP) ----------------------------------------------------------------------------
 include infra/p2/p2.mk
 
-.PHONY: help doctor setup lint test test-integration validate services up-p2 up-p3 down smoke-local
+.PHONY: bootstrap help doctor setup lint test test-integration validate services up-p2 up-p3 down smoke-local

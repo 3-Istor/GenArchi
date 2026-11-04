@@ -1,0 +1,136 @@
+- name: Installer PostgreSQL local, Zabbix (serveur + interface web) et Apache
+  ansible.builtin.apt:
+    name: [postgresql, python3-psycopg2, zabbix-server-pgsql, zabbix-frontend-php, php-pgsql, apache2, libapache2-mod-php]
+    state: present
+
+- name: Démarrer le PostgreSQL local de Zabbix
+  ansible.builtin.systemd_service:
+    name: postgresql
+    enabled: true
+    state: started
+
+- name: Rôle PostgreSQL de Zabbix
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: zabbix
+    password: "{{ secrets.zabbix_db }}"
+
+- name: Base de Zabbix
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: zabbix
+    owner: zabbix
+    encoding: UTF-8
+    template: template0
+
+- name: Le schéma Zabbix est-il déjà chargé ?
+  become_user: postgres
+  ansible.builtin.command: psql -d zabbix -tAc "SELECT to_regclass('public.users') IS NOT NULL"
+  register: zabbix_schema
+  changed_when: false
+
+- name: Charger le schéma, les images et les données initiales
+  when: zabbix_schema.stdout != 't'
+  become_user: zabbix
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for f in schema images data; do zcat /usr/share/zabbix-server-pgsql/$f.sql.gz | psql -q -v ON_ERROR_STOP=1 -d zabbix; done
+  args:
+    executable: /bin/bash
+  changed_when: true
+  environment:
+    PGPASSWORD: "{{ secrets.zabbix_db }}"
+    PGHOST: localhost
+    PGUSER: zabbix
+
+- name: Configurer le serveur Zabbix
+  ansible.builtin.copy:
+    dest: /etc/zabbix/zabbix_server.conf.d/genarchi.conf
+    mode: "0640"
+    owner: root
+    group: zabbix
+    content: |
+      DBHost=localhost
+      DBName=zabbix
+      DBUser=zabbix
+      DBPassword={{ secrets.zabbix_db }}
+      StartPollers=10
+  notify: Redémarrer le serveur Zabbix
+
+- name: Configurer l'interface web
+  ansible.builtin.template:
+    src: zabbix.conf.php.j2
+    dest: /etc/zabbix/zabbix.conf.php
+    owner: root
+    group: www-data
+    mode: "0640"
+
+- name: Activer l'interface web dans Apache (http://monitoring/zabbix, via le bastion)
+  ansible.builtin.command: a2enconf zabbix-frontend-php
+  args:
+    creates: /etc/apache2/conf-enabled/zabbix-frontend-php.conf
+  notify: Recharger Apache
+
+- name: Démarrer les services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [zabbix-server, apache2, rsyslog]
+
+- name: Recevoir les journaux de toutes les VM (TCP 514), un fichier par serveur et par programme
+  ansible.builtin.copy:
+    dest: /etc/rsyslog.d/10-genarchi-server.conf
+    mode: "0644"
+    content: |
+      module(load="imtcp")
+      template(name="GenarchiPerHost" type="string" string="/var/log/remote/%HOSTNAME%/%PROGRAMNAME%.log")
+      ruleset(name="genarchi-remote") {
+        action(type="omfile" dynaFile="GenarchiPerHost" createDirs="on" dirCreateMode="0750" fileCreateMode="0640")
+        stop
+      }
+      input(type="imtcp" port="514" ruleset="genarchi-remote")
+  notify: Redémarrer rsyslog
+
+- name: Rotation des journaux reçus
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/genarchi-remote
+    mode: "0644"
+    content: |
+      /var/log/remote/*/*.log {
+        daily
+        rotate 14
+        compress
+        delaycompress
+        missingok
+        notifempty
+        sharedscripts
+        postrotate
+          /usr/lib/rsyslog/rsyslog-rotate
+        endscript
+      }
+
+- name: Flush des handlers (le serveur doit tourner avant la configuration par API)
+  ansible.builtin.meta: flush_handlers
+
+- name: Attendre l'API Zabbix
+  ansible.builtin.uri:
+    url: http://127.0.0.1/zabbix/api_jsonrpc.php
+    method: POST
+    body_format: json
+    body: { jsonrpc: "2.0", method: apiinfo.version, params: {}, id: 1 }
+  register: zbx_api
+  retries: 30
+  delay: 5
+  until: zbx_api.status == 200
+
+- name: Configurer Zabbix par API (mot de passe, auto-enregistrement, alertes Discord)
+  ansible.builtin.script:
+    cmd: >-
+      zabbix_setup.py --url http://127.0.0.1/zabbix/api_jsonrpc.php
+      --discord-webhook "{{ discord_webhook }}" --public-url "https://{{ public_domain }}/readyz"
+    executable: /usr/bin/python3
+  environment:
+    ZABBIX_ADMIN_PASSWORD: "{{ secrets.zabbix_admin }}"
+  register: zbx_setup
+  changed_when: "'changed' in zbx_setup.stdout"

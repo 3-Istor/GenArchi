@@ -1,0 +1,79 @@
+- name: Installer Apache et ModSecurity (règles OWASP CRS du paquet Debian)
+  ansible.builtin.apt:
+    name: [apache2, libapache2-mod-security2, modsecurity-crs]
+    state: present
+
+- name: Modules Apache
+  community.general.apache2_module:
+    name: "{{ item }}"
+    state: present
+  loop: [proxy, proxy_http, proxy_balancer, proxy_hcheck, lbmethod_byrequests, slotmem_shm, watchdog, remoteip, headers, security2]
+  notify: Redémarrer Apache
+
+- name: ModSecurity en mode blocage
+  ansible.builtin.shell: |
+    set -euo pipefail
+    sed -e 's/^SecRuleEngine .*/SecRuleEngine On/' /etc/modsecurity/modsecurity.conf-recommended > /etc/modsecurity/modsecurity.conf.new
+    if cmp -s /etc/modsecurity/modsecurity.conf.new /etc/modsecurity/modsecurity.conf; then rm /etc/modsecurity/modsecurity.conf.new; echo same
+    else mv /etc/modsecurity/modsecurity.conf.new /etc/modsecurity/modsecurity.conf; fi
+  args:
+    executable: /bin/bash
+  register: modsec
+  changed_when: modsec.stdout != 'same'
+  notify: Redémarrer Apache
+
+- name: Durcissement (pas de version affichée, pas de TRACE)
+  ansible.builtin.copy:
+    dest: /etc/apache2/conf-available/genarchi-hardening.conf
+    mode: "0644"
+    content: |
+      ServerTokens Prod
+      ServerSignature Off
+      TraceEnable Off
+      Header always set X-Content-Type-Options "nosniff"
+      Header always set Referrer-Policy "strict-origin-when-cross-origin"
+      Header always set Strict-Transport-Security "max-age=31536000"
+  notify: Redémarrer Apache
+
+- name: Front statique
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../../app/front/"
+    dest: /var/www/genarchi/
+    mode: "0644"
+
+- name: Page de santé du reverse proxy (sonde du load balancer)
+  ansible.builtin.copy:
+    dest: /var/www/genarchi/rp-health
+    content: "ok\n"
+    mode: "0644"
+
+- name: Site
+  ansible.builtin.template:
+    src: genarchi.conf.j2
+    dest: /etc/apache2/sites-available/genarchi.conf
+    mode: "0644"
+  notify: Redémarrer Apache
+
+- name: Activer le site et la configuration, désactiver le site par défaut
+  ansible.builtin.shell: |
+    set -euo pipefail
+    out=""
+    a2query -s genarchi >/dev/null 2>&1 || { a2ensite -q genarchi; out=changed; }
+    a2query -c genarchi-hardening >/dev/null 2>&1 || { a2enconf -q genarchi-hardening; out=changed; }
+    ! a2query -s 000-default >/dev/null 2>&1 || { a2dissite -q 000-default; out=changed; }
+    echo "$out"
+  args:
+    executable: /bin/bash
+  register: sites
+  changed_when: sites.stdout == 'changed'
+  notify: Redémarrer Apache
+
+- name: Vérifier la configuration avant redémarrage
+  ansible.builtin.command: apache2ctl configtest
+  changed_when: false
+
+- name: Démarrer Apache
+  ansible.builtin.systemd_service:
+    name: apache2
+    enabled: true
+    state: started

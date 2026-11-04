@@ -1,0 +1,39 @@
+# Géré par Ansible (rôle reverse_proxy).
+# LB régional (TLS) → ce reverse proxy (WAF ModSecurity) → les 4 serveurs d'application des deux DC.
+<VirtualHost *:80>
+    ServerName {{ public_domain }}
+    DocumentRoot /var/www/genarchi
+
+    # Adresse réelle du client : transmise par les proxys du LB (sous-réseau proxy-only).
+    RemoteIPHeader X-Forwarded-For
+    RemoteIPTrustedProxy {{ proxy_only_cidr }}
+    RequestHeader set X-Forwarded-Proto "https"
+
+    <Directory /var/www/genarchi>
+        Options -Indexes
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    # Pool de serveurs d'application. Health check actif sur /readyz : un serveur arrêté, ou dont la base
+    # ne répond plus, sort de la rotation en ~10 s et y revient seul.
+    <Proxy "balancer://app">
+{% for h in groups['app'] %}
+        BalancerMember "http://{{ p2_hosts[h] }}:8080" route={{ h }} hcmethod=GET hcuri=/readyz hcinterval=5 hcfails=2 hcpasses=2 connectiontimeout=2 timeout=30 retry=10
+{% endfor %}
+        ProxySet lbmethod=byrequests failontimeout=On
+    </Proxy>
+
+    ProxyPreserveHost On
+    ProxyPassMatch "{{ api_path_regex }}" "balancer://app/$1$2"
+    ProxyPassReverse "/" "balancer://app/"
+
+    # La sonde du LB ne passe pas par le WAF.
+    <Location "/rp-health">
+        SecRuleEngine Off
+    </Location>
+
+    LogFormat "%a %{X-Request-ID}i \"%r\" %>s %b %D \"%{BALANCER_WORKER_NAME}e\"" genarchi
+    CustomLog ${APACHE_LOG_DIR}/genarchi-access.log genarchi
+    ErrorLog ${APACHE_LOG_DIR}/genarchi-error.log
+</VirtualHost>

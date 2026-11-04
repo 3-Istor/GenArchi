@@ -1,0 +1,84 @@
+# Géré par Ansible (rôle patroni). Paramètres du cluster (section bootstrap.dcs) : lus une seule fois,
+# à la création ; ensuite on les change avec `patronictl edit-config` (runbook p2-db).
+scope: genarchi
+namespace: /service/
+name: {{ inventory_hostname }}
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: {{ p2_hosts[inventory_hostname] }}:8008
+
+etcd3:
+  hosts: {% for h in groups['etcd'] %}{{ p2_hosts[h] }}:2379{{ ',' if not loop.last else '' }}{% endfor %}
+
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    # Réplication synchrone : un commit est écrit dans les deux DC (RPO = 0). Si le réplica tombe,
+    # Patroni repasse en asynchrone plutôt que de bloquer les écritures (synchronous_mode_strict: false).
+    synchronous_mode: true
+    synchronous_mode_strict: false
+    failsafe_mode: true
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        wal_level: replica
+        hot_standby: "on"
+        wal_log_hints: "on"
+        max_wal_senders: 10
+        max_replication_slots: 10
+        wal_keep_size: 1GB
+        password_encryption: scram-sha-256
+        max_connections: 200
+        shared_buffers: 512MB
+    # Slot permanent pour Barman : il existe sur le primaire, quel que soit le serveur qui l'est.
+    slots:
+      barman:
+        type: physical
+  initdb:
+    - encoding: UTF8
+    - locale: C.UTF-8
+    - data-checksums
+
+postgresql:
+  listen: 0.0.0.0:5432
+  connect_address: {{ p2_hosts[inventory_hostname] }}:5432
+  data_dir: /var/lib/postgresql/17/genarchi
+  bin_dir: /usr/lib/postgresql/17/bin
+  pgpass: /var/lib/postgresql/.pgpass_patroni
+  authentication:
+    superuser:
+      username: postgres
+      password: "{{ secrets.postgres }}"
+    replication:
+      username: replicator
+      password: "{{ secrets.replicator }}"
+    rewind:
+      username: rewind
+      password: "{{ secrets.rewind }}"
+  pg_hba:
+    - local   all          all                                  peer
+    - host    all          all          127.0.0.1/32            scram-sha-256
+    - host    replication  replicator   {{ subnets.data }}      scram-sha-256
+    - host    all          rewind       {{ subnets.data }}      scram-sha-256
+    - host    all          postgres     {{ subnets.data }}      scram-sha-256
+    - host    {{ db_name }} {{ db_user }} {{ subnets.app }}     scram-sha-256
+    - host    all          barman       {{ p2_hosts['backup'] }}/32 scram-sha-256
+    - host    replication  streaming_barman {{ p2_hosts['backup'] }}/32 scram-sha-256
+{% for line in pg_hba_extra | default([]) %}
+    - {{ line }}
+{% endfor %}
+
+watchdog:
+  mode: off
+
+tags:
+  nofailover: false
+  noloadbalance: false
+  clonefrom: false
+  nosync: false

@@ -1,0 +1,17 @@
+# Valeurs communes. Les adresses, noms et secrets viennent de l'inventaire généré par OpenTofu.
+app_uid: 10001
+app_user: genarchi
+app_root: /opt/genarchi
+app_env_file: /etc/genarchi/genarchi.env
+tickets_mount: /mnt/tickets
+nas_export: /srv/tickets
+db_name: genarchi
+db_user: genarchi
+db_host: "db.{{ internal_domain }}"
+nas_host: "nas.{{ internal_domain }}"
+monitoring_ip: "{{ p2_hosts['monitoring'] }}"
+chaos_enabled: true
+# Chemins proxifiés vers l'app ; le reste (le front) est servi par Apache.
+api_path_regex: "^/(events|orders|tickets|t|admin|internal/chaos|healthz|readyz|version|docs|openapi\\.json)(/.*)?$"
+# Webhook Discord des alertes Zabbix (facultatif) : -e discord_webhook=https://discord.com/api/webhooks/...
+discord_webhook: ""

@@ -1,0 +1,2 @@
+etcd_ip: "{{ p2_hosts[inventory_hostname] }}"
+etcd_endpoints: "{{ groups['etcd'] | map('extract', p2_hosts) | map('regex_replace', '^(.*)$', 'http://\\1:2379') | join(',') }}"

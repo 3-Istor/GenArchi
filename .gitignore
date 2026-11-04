@@ -64,3 +64,5 @@ build/
 infra/p2/ansible/inventory/generated.ini
 infra/p2/ansible/ssh_config
 *.retry
+infra/*/env.mk
+infra/p3/.image

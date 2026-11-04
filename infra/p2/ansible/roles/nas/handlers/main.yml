@@ -1,0 +1,14 @@
+- name: Recharger systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Redémarrer NFS
+  when: inventory_hostname == nas_active
+  ansible.builtin.systemd_service:
+    name: nfs-server
+    state: restarted
+
+- name: Recharger les exports
+  when: inventory_hostname == nas_active
+  ansible.builtin.command: exportfs -ra
+  changed_when: true

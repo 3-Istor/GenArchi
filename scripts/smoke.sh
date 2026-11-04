@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Test de fumée de bout en bout, identique pour local, P2 et P3.
 # Usage : scripts/smoke.sh <BASE_URL> <ADMIN_TOKEN> <STAFF_TOKEN>
+# `cond && ok || ko` est sûr ici : ok ne fait qu'afficher, ko arrête le script.
+# shellcheck disable=SC2015
 set -euo pipefail
 BASE=${1:?BASE_URL}; ADMIN=${2:?ADMIN_TOKEN}; STAFF=${3:?STAFF_TOKEN}
 C=(curl -sS --max-time 10)
