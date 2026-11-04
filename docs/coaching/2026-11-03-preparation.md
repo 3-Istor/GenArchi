@@ -23,6 +23,8 @@ Toutes les propositions ci-dessous sont non validées. Porteurs : à confirmer.
 
 ## Éléments à apporter
 
+Le [support de présentation](2026-11-03-coaching-1.pptx) est disponible. Insérer les images des architectures P2 et P3 sur les diapositives 3 et 4, qui ne conservent que leur titre pour laisser les Tech Leads organiser leur présentation. La diapositive 2 présente notre compréhension à confirmer sous forme de deux schémas inspirés du kickoff ; la diapositive 5 regroupe les questions en une seule liste. Les notes du présentateur contiennent les références et les précisions orales.
+
 - Les deux pistes d’architecture du [kickoff, diapositives 4–5](../references/originaux/kickoff.pptx), à annoter comme propositions. Aucun nouveau schéma détaillé n’est encore produit.
 - L’inventaire des accès disponibles, des quotas et du budget : **à constituer**, sans secrets dans le dépôt.
 - Les affectations PM, Tech Leads P2/P3 et appuis transverses : **à confirmer** (Q-008).
