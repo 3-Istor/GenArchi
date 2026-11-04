@@ -1,0 +1,119 @@
+# Environnement local : la même application, branchée « comme en P2 » ou « comme en P3 ».
+#   make up-p2   -> PostgreSQL + RabbitMQ + API + consommateur       http://localhost:8080
+#   make up-p3   -> émulateurs Firestore/Pub/Sub + API + worker      http://localhost:8090
+#   make services -> uniquement les dépendances, pour les tests d'intégration
+# Images servies par mirror.gcr.io (cache Google de Docker Hub) pour éviter la limite de téléchargements.
+
+x-app: &app
+  image: genarchi-app:local
+  build: { context: ./app, args: { APP_VERSION: local } }
+  restart: unless-stopped
+  environment: &app-env
+    PLATFORM: local
+    LOG_LEVEL: INFO
+    ADMIN_TOKEN: local-admin-token
+    STAFF_TOKEN: local-staff-token
+    CHAOS_ENABLED: "true"
+    BLOB_BACKEND: fs
+    BLOB_FS_ROOT: /data/tickets
+    FRONT_DIR: /front
+
+services:
+  postgres:
+    image: mirror.gcr.io/library/postgres:17-alpine
+    environment: { POSTGRES_USER: genarchi, POSTGRES_PASSWORD: genarchi, POSTGRES_DB: genarchi }
+    ports: ["55432:5432"]
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "genarchi"], interval: 2s, retries: 30 }
+    profiles: ["p2", "services"]
+
+  rabbitmq:
+    image: mirror.gcr.io/library/rabbitmq:4.1-management-alpine
+    environment: { RABBITMQ_DEFAULT_USER: genarchi, RABBITMQ_DEFAULT_PASS: genarchi }
+    ports: ["55672:5672", "15672:15672"]
+    healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 5s, retries: 30 }
+    profiles: ["p2", "services"]
+
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud emulators firestore start --host-port=0.0.0.0:8681
+    ports: ["8681:8681"]
+    profiles: ["p3", "services"]
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8682 --project=demo-genarchi
+    ports: ["8682:8682"]
+    profiles: ["p3"]
+
+  # --- profil « comme en P2 » ------------------------------------------------------------------
+  migrate-p2:
+    <<: *app
+    restart: "no"
+    command: migrate
+    environment: &p2-env
+      <<: *app-env
+      PUBLIC_BASE_URL: http://localhost:8080
+      DATA_BACKEND: postgres
+      DATABASE_URL: postgresql://genarchi:genarchi@postgres:5432/genarchi
+      EVENTS_BACKEND: rabbitmq
+      AMQP_URLS: amqp://genarchi:genarchi@rabbitmq:5672/
+    depends_on: { postgres: { condition: service_healthy } }
+    profiles: ["p2"]
+
+  api-p2:
+    <<: *app
+    environment: { <<: *p2-env, INSTANCE_NAME: api-p2-local }
+    ports: ["8080:8080"]
+    volumes: ["tickets-p2:/data/tickets"]
+    depends_on:
+      migrate-p2: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    profiles: ["p2"]
+
+  consumer-p2:
+    <<: *app
+    command: consume
+    environment: { <<: *p2-env, INSTANCE_NAME: consumer-p2-local }
+    volumes: ["tickets-p2:/data/tickets"]
+    depends_on:
+      migrate-p2: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    profiles: ["p2"]
+
+  # --- profil « comme en P3 » ------------------------------------------------------------------
+  # Pas d'Eventarc en local : le rattrapage `issue-pending` tourne en boucle et joue son rôle.
+  api-p3:
+    <<: *app
+    environment: &p3-env
+      <<: *app-env
+      PUBLIC_BASE_URL: http://localhost:8090
+      DATA_BACKEND: firestore
+      FIRESTORE_PROJECT: demo-genarchi
+      FIRESTORE_EMULATOR_HOST: firestore:8681
+      EVENTS_BACKEND: none
+      INSTANCE_NAME: api-p3-local
+    ports: ["8090:8080"]
+    volumes: ["tickets-p3:/data/tickets"]
+    depends_on: [firestore]
+    profiles: ["p3"]
+
+  worker-p3:
+    <<: *app
+    command: serve-worker
+    environment: { <<: *p3-env, INSTANCE_NAME: worker-p3-local }
+    ports: ["8091:8080"]
+    volumes: ["tickets-p3:/data/tickets"]
+    depends_on: [firestore]
+    profiles: ["p3"]
+
+  sweeper-p3:
+    <<: *app
+    entrypoint: ["sh", "-c", "while true; do genarchi issue-pending --older-than 0 >/dev/null; sleep 2; done"]
+    environment: { <<: *p3-env, INSTANCE_NAME: sweeper-p3-local }
+    volumes: ["tickets-p3:/data/tickets"]
+    depends_on: [firestore]
+    profiles: ["p3"]
+
+volumes:
+  tickets-p2: {}
+  tickets-p3: {}

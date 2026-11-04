@@ -44,3 +44,23 @@ terraform.rc
 *.bak
 *.log
 .cache/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Outils locaux
+.direnv/
+.terraform.d/
+infra/p2/ansible/inventory/generated.ini
+infra/p2/ansible/ssh_config
+*.retry

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Billetterie GenArchi</title>
+  <style>
+    :root { --ink:#172a43; --muted:#61738b; --p:#3979d8; --ok:#0da984; --bg:#f6f8fb; --line:#d9e1ea; }
+    * { box-sizing: border-box; }
+    body { margin:0; font: 16px/1.5 system-ui, sans-serif; color:var(--ink); background:var(--bg); }
+    header { padding: 20px max(16px, 4vw); background:#fff; border-bottom:1px solid var(--line); }
+    header h1 { margin:0; font-size: 1.4rem; }
+    header small { color:var(--muted); }
+    main { max-width: 860px; margin: 24px auto; padding: 0 16px; display:grid; gap:16px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .grow { flex:1; min-width:200px; }
+    button { font:inherit; border:0; border-radius:6px; padding:8px 14px; background:var(--p); color:#fff; cursor:pointer; }
+    button:disabled { opacity:.5; cursor:default; }
+    input, select { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; }
+    .muted { color:var(--muted); font-size:.9rem; }
+    .tickets { display:flex; gap:16px; flex-wrap:wrap; }
+    .tickets img { width:160px; height:160px; border:1px solid var(--line); border-radius:6px; }
+    .err { color:#b42318; }
+    code { font-size:.85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Billetterie GenArchi</h1>
+    <small id="served">…</small>
+  </header>
+  <main>
+    <section class="card">
+      <h2>Événements</h2>
+      <div id="events" class="muted">Chargement…</div>
+    </section>
+    <section class="card" id="order" hidden>
+      <h2>Mes billets</h2>
+      <div id="order-status" class="muted"></div>
+      <div class="tickets" id="tickets"></div>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const api = (path, opts = {}) => fetch(path, { headers: { "Content-Type": "application/json", ...(opts.headers || {}) }, ...opts });
+
+    async function whoServed() {
+      try {
+        const v = await (await api("/version")).json();
+        $("served").textContent = `Servi par ${v.instance} · ${v.platform.toUpperCase()} · ${v.region || v.zone || "local"} · contrat ${v.contract_version}`;
+      } catch { $("served").textContent = "API injoignable"; }
+    }
+
+    async function loadEvents() {
+      const r = await api("/events");
+      const { items } = await r.json();
+      if (!items.length) { $("events").textContent = "Aucun événement."; return; }
+      $("events").innerHTML = "";
+      for (const e of items) {
+        const div = document.createElement("div");
+        div.className = "row";
+        div.style.padding = "8px 0";
+        div.innerHTML = `<div class="grow"><b></b><br><span class="muted"></span></div>
+          <select aria-label="Nombre de billets">${[1,2,3,4].map(n => `<option>${n}</option>`).join("")}</select>
+          <input type="email" placeholder="email" value="alice@example.com" aria-label="Email">
+          <button>Acheter</button>`;
+        div.querySelector("b").textContent = e.name;
+        div.querySelector("span").textContent = `${e.venue} · ${new Date(e.starts_at).toLocaleString("fr-FR")} · ${(e.price_cents / 100).toFixed(2)} € · ${e.remaining}/${e.capacity} places · ${e.status}`;
+        const btn = div.querySelector("button");
+        btn.disabled = e.status !== "on_sale";
+        btn.onclick = () => buy(e.id, Number(div.querySelector("select").value), div.querySelector("input").value);
+        $("events").appendChild(div);
+      }
+    }
+
+    async function buy(eventId, quantity, email) {
+      $("order").hidden = false;
+      $("order-status").textContent = "Achat en cours…";
+      $("tickets").innerHTML = "";
+      const r = await api(`/events/${eventId}/orders`, {
+        method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({ buyer_email: email, quantity }),
+      });
+      const body = await r.json();
+      if (!r.ok) { $("order-status").innerHTML = `<span class="err">${body.detail || body.code}</span>`; return; }
+      $("order-status").innerHTML = `Commande <code>${body.id}</code> confirmée. Émission des QR…`;
+      for (const t of body.tickets) {
+        const box = document.createElement("div");
+        box.innerHTML = `<div class="muted">${t.id.slice(0, 12)}…</div><div class="muted">en attente</div>`;
+        $("tickets").appendChild(box);
+        poll(t.id, box);
+      }
+      loadEvents();
+    }
+
+    async function poll(ticketId, box) {
+      const started = Date.now();
+      while (Date.now() - started < 20 * 60 * 1000) {
+        const t = await (await api(`/tickets/${ticketId}`)).json();
+        if (t.qr_url) {
+          const seconds = ((Date.now() - started) / 1000).toFixed(1);
+          box.innerHTML = `<a href="/t/${ticketId}"><img alt="QR du billet" src="${t.qr_url}"></a><div class="muted">émis en ${seconds} s</div>`;
+          return;
+        }
+        await new Promise((res) => setTimeout(res, 1000));
+      }
+    }
+
+    whoServed();
+    loadEvents();
+  </script>
+</body>
+</html>

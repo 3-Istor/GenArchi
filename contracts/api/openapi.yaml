@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
   title: GenArchi Billetterie API
-  version: 0.1.0
+  version: 0.2.0
   summary: API HTTP de la billetterie, identique sur Platform 2 et Platform 3.
   description: |
-    Contrat 0.1.0 (brouillon). Même API, même code, deux plateformes.
+    Contrat 0.2.0. Même API, même code, deux plateformes.
 
     - Les erreurs suivent RFC 9457 (`application/problem+json`) avec un champ `code` stable.
     - Les dates sont en RFC 3339 UTC.
@@ -34,7 +34,7 @@ tags:
   - name: internal
     description: |
       Points d'entrée réservés à la plateforme et aux tests.
-      `/internal/tickets/issue` n'existe que sur le processus `worker`, qui n'est pas derrière le load balancer.
+      `/internal/events/ticket-created` n'existe que sur le processus `worker`, qui n'est pas derrière le load balancer.
       `/internal/chaos` passe par le load balancer mais exige le jeton admin et `CHAOS_ENABLED=true`.
 
 paths:
@@ -312,26 +312,28 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /internal/tickets/issue:
+  /internal/events/ticket-created:
     post:
       tags: [internal]
-      operationId: issueTicketsFromPush
-      summary: Worker P3 — réception push Pub/Sub de `ticket.purchased`
+      operationId: ticketCreatedEvent
+      summary: Worker P3 — CloudEvent Firestore « document billet créé », livré par Eventarc
       description: |
-        Exposé uniquement par le processus `worker`, en P3. Authentifié par le jeton OIDC
-        de Pub/Sub (vérifié par Cloud Run IAM, pas par l'app). Doit être idempotent (I5).
-        Répond 2xx une fois tous les billets de la commande émis ; toute autre réponse
-        provoque une nouvelle livraison par Pub/Sub.
-        En P2, la même logique est appelée par la commande CLI `issue-pending` (voir runtime).
+        Exposé uniquement par le processus `worker`, en P3, derrière l'IAM Cloud Run (pas derrière le LB).
+        Mode binaire CloudEvents : l'identifiant du billet est lu dans `ce-subject`
+        (`documents/tickets/{id}`) ; le mode structuré (champ `subject`) est aussi accepté.
+        Idempotent (I5) : une relivraison ne change rien. Toute réponse autre que 2xx provoque une relivraison.
+      parameters:
+        - { name: ce-subject, in: header, required: false, schema: { type: string } }
+        - { name: ce-type, in: header, required: false, schema: { type: string } }
+        - { name: ce-id, in: header, required: false, schema: { type: string } }
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/PubSubPushEnvelope" }
+            schema: { type: object }
       responses:
-        "204": { description: Traité (ou déjà traité) }
-        "400": { description: "Message illisible : sera envoyé en dead-letter après 5 tentatives" }
-        "503": { description: "Dépendance indisponible : Pub/Sub réessaiera" }
+        "204": { description: "Traité, déjà traité, ou événement sans billet (ignoré)" }
+        "503": { description: "Dépendance indisponible : Eventarc relivrera" }
 
   /internal/chaos:
     post:
@@ -411,13 +413,13 @@ components:
       required: [app_version, contract_version, platform, process, instance]
       properties:
         app_version: { type: string, examples: ["1.4.2+gabc1234"] }
-        contract_version: { type: string, examples: ["0.1.0"] }
+        contract_version: { type: string, examples: ["0.2.0"] }
         platform: { type: string, enum: [local, p2, p3] }
         process: { type: string, enum: [api, worker] }
         region: { type: [string, "null"], examples: [europe-west1] }
         zone: { type: [string, "null"], examples: [europe-west9-a] }
         instance: { type: string, description: "Nom de VM en P2, révision Cloud Run + id d'instance en P3" }
-        data_backend: { type: string, enum: [postgres, firestore] }
+        data_backend: { type: string, enum: [postgres, firestore, memory] }
 
     EventStatus:
       type: string
@@ -531,23 +533,6 @@ components:
             - `latency` : ajoute `latency_ms` à chaque requête pendant `duration_s`
         duration_s: { type: integer, minimum: 1, maximum: 600, default: 60 }
         latency_ms: { type: integer, minimum: 1, maximum: 10000, default: 1000 }
-
-    PubSubPushEnvelope:
-      type: object
-      description: Enveloppe standard d'un push Pub/Sub. `message.data` est un CloudEvent JSON encodé en base64.
-      required: [message, subscription]
-      properties:
-        subscription: { type: string }
-        message:
-          type: object
-          required: [data, messageId]
-          properties:
-            data: { type: string, contentEncoding: base64 }
-            messageId: { type: string }
-            publishTime: { type: string, format: date-time }
-            attributes:
-              type: object
-              additionalProperties: { type: string }
 
     Problem:
       type: object

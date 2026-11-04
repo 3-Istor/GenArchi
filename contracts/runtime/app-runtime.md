@@ -1,7 +1,11 @@
 # Contrat d'exécution de l'application
 
-Contrat `0.1.0`. Ce document est l'interface entre **le code de l'app** et **les plateformes**.
+Contrat `0.2.0`. Ce document est l'interface entre **le code de l'app** (`app/`) et **les plateformes** (`infra/p2`, `infra/p3`).
 Si l'app respecte la partie A et que chaque plateforme fournit la partie B, la même version du code tourne en local, en P2 et en P3 sans modification.
+
+Changements depuis `0.1.0` : architectures « état de l'art » validées le 2026-11-04 (voir [`docs/architecture/`](../../docs/architecture/README.md)).
+- P2 : les QR sont émis par des workers qui consomment une file **RabbitMQ** (plus de batch toutes les 15 min) ; un rattrapage périodique reste lancé par l'ordonnanceur.
+- P3 : l'API **ne publie plus** d'événement. C'est **Firestore** qui émet l'événement « document billet créé », livré au worker par **Eventarc**. Le worker publie `ticket.issued` sur Pub/Sub, qui alimente BigQuery.
 
 ---
 
@@ -9,74 +13,68 @@ Si l'app respecte la partie A et que chaque plateforme fournit la partie B, la m
 
 ### A1. Processus
 
-L'app est un seul paquet qui expose quatre commandes :
+Un seul paquet Python (`genarchi`), une seule commande `genarchi <sous-commande>` :
 
-| Commande | Rôle | Local | P2 | P3 |
+| Sous-commande | Rôle | Local | P2 | P3 |
 |---|---|---|---|---|
-| `serve-api` | Serveur HTTP de l'API (`contracts/api/openapi.yaml`) | ✅ | `app-01`, `app-02` (systemd) | Cloud Run service `api` |
-| `serve-worker` | Serveur HTTP qui reçoit les push Pub/Sub sur `POST /internal/tickets/issue` | ✅ | ❌ (pas de bus) | Cloud Run service `worker` |
-| `issue-pending [--limit N]` | Émet les QR des billets `pending` puis se termine | ✅ | `batch-01`, toutes les 15 min (timer systemd) | Sweeper : Cloud Run job planifié, toutes les 5 min, ne traite que les `pending` de plus de 2 min |
-| `migrate` | Crée ou migre le schéma (tables SQL ou index Firestore) | ✅ | Lancé à la main via runbook | Cloud Run job, lancé par la CI avant le déploiement |
+| `serve-api` | API HTTP ([`openapi.yaml`](../api/openapi.yaml)) | ✅ | 4 VM `app-*` (systemd) | Cloud Run `api`, 2 régions |
+| `serve-worker` | Reçoit les CloudEvents Firestore sur `POST /internal/events/ticket-created` | ✅ (profil p3) | ❌ | Cloud Run `worker`, 2 régions |
+| `consume` | Consomme la file RabbitMQ `tickets.issue` | ✅ (profil p2) | 4 VM `app-*` (systemd, à côté de l'API) | ❌ |
+| `issue-pending [--older-than S] [--limit N]` | Rattrapage : émet les billets `pending` trop anciens, puis s'arrête | ✅ | Ordonnanceur, toutes les 5 min | Cloud Run job planifié, toutes les 5 min |
+| `migrate` | Crée ou met à jour le schéma (SQL) ; no-op en Firestore | ✅ | Runbook de mise en production | — |
+| `seed [--capacity N]` | Crée un événement de démonstration | ✅ | Runbook | Cloud Run job à la demande |
 
-Les deux déclencheurs d'émission (`serve-worker` et `issue-pending`) appellent **la même fonction** `issue_ticket(ticket_id)`, idempotente (invariant I5).
+Les trois déclencheurs d'émission (`serve-worker`, `consume`, `issue-pending`) appellent **la même fonction** `issue_ticket(ticket_id)`, idempotente (invariant I5).
 
 ### A2. Packaging
 
-- **Sans container** (P2) : installable par `pip install <wheel>` dans un virtualenv, les commandes ci-dessus étant des points d'entrée console. Aucune dépendance système au-delà de Python 3.11+ et `libpq` (P2).
-- **Container** (local, P3) : un `Dockerfile` à la racine de `app/` produit une image OCI qui lance `serve-api` par défaut ; la commande est surchargée pour les autres processus.
-- Une seule version de code = un seul tag git = une wheel + une image construites par la CI.
+- **Sans conteneur** (P2) : `uv build` produit une wheel installée dans un virtualenv sur la VM ; `genarchi` est un point d'entrée console. Python ≥ 3.11, aucune bibliothèque système requise (pilotes en pur Python ou wheels binaires).
+- **Conteneur** (local, P3) : [`app/Dockerfile`](../../app/Dockerfile) produit une image OCI non-root qui lance `genarchi serve-api` ; la commande est surchargée pour les autres processus.
+- Une version de code = un tag git = une wheel + une image.
 
 ### A3. Configuration (12 facteurs)
 
-- **Toute** la configuration passe par des variables d'environnement (liste en partie C). Aucune valeur d'environnement en dur, aucun fichier de config à éditer sur un serveur.
-- Les secrets (`ADMIN_TOKEN`, `STAFF_TOKEN`, mot de passe de base) arrivent aussi par variables d'environnement ; c'est la plateforme qui les injecte depuis son coffre.
-- Variable inconnue ou obligatoire manquante → l'app **refuse de démarrer** avec un message explicite.
+- **Toute** la configuration passe par des variables d'environnement (partie C). Aucune valeur d'environnement en dur.
+- Les secrets (`ADMIN_TOKEN`, `STAFF_TOKEN`, mots de passe) arrivent aussi par l'environnement ; c'est la plateforme qui les injecte depuis son coffre.
+- Variable obligatoire manquante ou valeur invalide → l'app **refuse de démarrer** avec un message explicite.
 
 ### A4. Ports et adaptateurs
 
-Le code métier ne dépend que de ces interfaces. Un adaptateur par backend, choisi au démarrage par variable d'environnement.
+Le code métier (`genarchi.domain`) ne dépend que de ces interfaces ; l'adaptateur est choisi au démarrage.
 
 ```text
-EventRepository       get(event_id) / list(status, limit, cursor) / create(event)
-OrderService          place_order(event_id, idempotency_key, buyer_email, quantity) -> Order
-                      # atomique : I1 + I2 dans une transaction
-TicketRepository      get(ticket_id) / list_pending(older_than, limit) / mark_issued(ticket_id, qr_object, at)
-                      / mark_scanned(ticket_id, at) -> (Ticket, already_scanned: bool)
-BlobStore             put(key, bytes, content_type) / get(key) -> bytes / signed_url(key, ttl) -> url | None
-EventPublisher        publish(cloud_event)            # no-op en P2
+Store            get_event / list_events / create_event
+                 place_order(event_id, idempotency_key, buyer_email, quantity) -> (Order, created: bool)   # I1 + I2 atomiques
+                 get_order / get_ticket / list_pending(older_than, limit)
+                 mark_issued(ticket_id, qr_object, at) / mark_scanned(ticket_id, at) -> (Ticket, already: bool)
+                 stats(event_id) / ping()
+BlobStore        put(key, data, content_type) / get(key) / signed_url(key, ttl) -> url | None
+Publisher        publish(cloud_event)
 ```
 
-| Interface | `local` | `p2` | `p3` |
-|---|---|---|---|
-| Repositories + OrderService | `postgres` (compose) ou `firestore` (émulateur) | `postgres` | `firestore` |
-| BlobStore | `fs` (dossier local) | `fs` (partage NFS monté sur `/mnt/tickets`) | `gcs` |
-| EventPublisher | `none` ou `pubsub` (émulateur) | `none` | `pubsub` |
+| Interface | Profil local « p2 » | Profil local « p3 » | P2 | P3 |
+|---|---|---|---|---|
+| `Store` | `postgres` | `firestore` (émulateur) | `postgres` (via l'IP virtuelle du cluster) | `firestore` |
+| `BlobStore` | `fs` | `fs` | `fs` (NFS monté sur `/mnt/tickets`) | `gcs` |
+| `Publisher` côté API | `rabbitmq` | `none` | `rabbitmq` | `none` (Firestore émet) |
+| `Publisher` côté worker | `none` | `none` ou `pubsub` (émulateur) | `none` | `pubsub` (`ticket.issued`) |
 
-Les tests de contrat (`contracts/tests/acceptance.md`) sont lancés **sur chaque combinaison d'adaptateurs** : c'est ce qui prouve que P2 et P3 servent bien la même app.
+Les tests de contrat sont lancés sur chaque profil : c'est ce qui prouve que P2 et P3 servent bien la même app.
 
 ### A5. Comportement
 
 | Exigence | Détail |
 |---|---|
 | Port | Écoute sur `0.0.0.0:$PORT` (défaut `8080`) |
-| Sans état | Aucune session, aucun cache métier, aucun fichier écrit hors de `/tmp` (I6) |
-| Démarrage | Prêt en moins de **5 s** hors migrations ; `/healthz` répond dès que le serveur écoute, `/readyz` seulement quand la base répond |
-| Arrêt | Sur `SIGTERM` : arrête d'accepter, termine les requêtes en cours, sort en moins de **10 s** |
-| Logs | Une ligne JSON par événement sur **stdout** (champs ci-dessous). Jamais de fichier de log géré par l'app |
-| Traces | Propage l'en-tête W3C `traceparent` (HTTP entrant → CloudEvent sortant → worker). Exporte en OTLP si `OTEL_EXPORTER_OTLP_ENDPOINT` est défini ; sinon ne fait rien |
-| Timeouts | Appels base ≤ 2 s, appels blob ≤ 5 s, publication ≤ 2 s. Publication échouée = log `warning`, la requête d'achat **réussit quand même** (le sweeper rattrape) |
-| Identité | `GET /version` renvoie plateforme, région/zone, instance, version de code et version de contrat |
+| Sans état | Aucune session, aucun cache métier, aucun fichier écrit hors de `/tmp` et du stockage blob (I6) |
+| Démarrage | Prêt en moins de 5 s ; `/healthz` répond dès que le serveur écoute, `/readyz` seulement si la base répond |
+| Arrêt | Sur `SIGTERM` : termine les requêtes en cours et sort en moins de 10 s |
+| Logs | Une ligne JSON par événement sur stdout (`ts`, `severity`, `message`, `platform`, `process`, `instance`, `request_id`, `trace_id` + champs métier) |
+| Traces | Propage `traceparent` (HTTP → message → worker). Export OTLP seulement si `OTEL_EXPORTER_OTLP_ENDPOINT` est défini |
+| Publication | Après commit. Échec de publication = log `WARNING`, l'achat **réussit quand même** : `issue-pending` rattrape |
+| Identité | `GET /version` : plateforme, région ou zone, instance, version de code, version de contrat |
 
-Champs de log obligatoires :
-
-```json
-{"ts":"2026-12-04T17:00:01.234Z","severity":"INFO","message":"order placed",
- "platform":"p3","process":"api","instance":"api-00042-xyz",
- "request_id":"…","trace_id":"…","span_id":"…",
- "event_id":"evt_…","order_id":"ord_…","http_status":201,"latency_ms":37}
-```
-
-`severity` ∈ `DEBUG, INFO, WARNING, ERROR, CRITICAL` (noms compris nativement par Cloud Logging). En P3, `trace_id` est aussi écrit dans le champ `logging.googleapis.com/trace` pour corréler logs et traces.
+`severity` ∈ `DEBUG, INFO, WARNING, ERROR, CRITICAL`. En P3, la trace est aussi écrite dans `logging.googleapis.com/trace`.
 
 ---
 
@@ -84,48 +82,44 @@ Champs de log obligatoires :
 
 | Fourniture | P2 | P3 |
 |---|---|---|
-| Point d'entrée HTTP(S) public | Load balancer régional → nginx (`web-0x`) → `app-0x:8080` | Load balancer global → Cloud Run `api` (2 régions) |
-| Health check | Sur `/readyz`, intervalle 5 s, 2 échecs = retiré | Probes Cloud Run sur `/readyz` + outlier detection du LB |
-| Variables d'env | Fichier `/etc/genarchi/genarchi.env` (mode 0600) écrit par Ansible, chargé par systemd | Variables de service Cloud Run, secrets montés depuis Secret Manager |
-| Base de données | PostgreSQL 15, DSN via `DATABASE_URL` vers `db-primary.p2.genarchi.internal` | Firestore base `(default)` en `eur3` |
-| Stockage blob | Partage NFS monté sur `/mnt/tickets` sur `app-0x` et `batch-01` | Bucket Cloud Storage `BLOB_GCS_BUCKET` |
-| Bus d'événements | Aucun | Topics `ticket-purchased`, `ticket-issued`, `ticket-purchased-dlq` + abonnements push vers `worker` |
-| Déclenchement de `issue-pending` | Timer systemd sur `batch-01` (`*:0/15`) | Cloud Scheduler → Cloud Run job, toutes les 5 min |
-| Collecte des logs | journald → agent Zabbix (erreurs) ; consultation par SSH | Automatique (stdout → Cloud Logging) |
-| Traces | Aucune (hors périmètre P2) | Cloud Trace via OTLP |
-| Identité machine | `INSTANCE_NAME`, `ZONE` posés par Ansible | `K_SERVICE`, `K_REVISION` fournis par Cloud Run ; `REGION` posé par Terraform |
+| Entrée publique | LB régional (TLS) → Apache + ModSecurity (`rp-*`) → `app-*:8080` | LB global (TLS, Cloud Armor) → Cloud Run `api` (2 régions) |
+| Health check | `/readyz`, 5 s, 2 échecs = retiré | Probe de readiness Cloud Run sur `/readyz` (service health) |
+| Variables d'env | `/etc/genarchi/genarchi.env` (0600) écrit par Ansible | Variables Cloud Run, secrets depuis Secret Manager |
+| Base | PostgreSQL 17 + Patroni, joint via `db.p2.genarchi.internal` (IP virtuelle) | Firestore `(default)` en `eur3` |
+| Blob | NFS monté sur `/mnt/tickets` (NAS actif, disque répliqué) | Bucket `BLOB_GCS_BUCKET` (dual-région) |
+| Événements | RabbitMQ 3 nœuds : exchange `genarchi.events`, file quorum `tickets.issue` | Trigger Eventarc `google.cloud.firestore.document.v1.created` sur `tickets/{id}` → `worker` ; topic `ticket-issued` → BigQuery |
+| `issue-pending` | Timer systemd sur `scheduler`, toutes les 5 min | Cloud Scheduler → Cloud Run job, toutes les 5 min |
+| Logs | journald + rsyslog central sur `monitoring` | stdout → Cloud Logging |
+| Identité machine | `INSTANCE_NAME`, `ZONE` posés par Ansible | `K_SERVICE`, `K_REVISION` (Cloud Run), `REGION` posé par OpenTofu |
 
 ---
 
 ## C. Variables d'environnement
 
-| Variable | Obligatoire | Valeurs / exemple | Utilisée par |
-|---|---|---|---|
-| `PLATFORM` | oui | `local`, `p2`, `p3` | tous |
-| `PORT` | non | `8080` | serveurs |
-| `LOG_LEVEL` | non | `INFO` | tous |
-| `PUBLIC_BASE_URL` | oui | `https://p3.genarchi.example` | api, émission (contenu du QR) |
-| `DATA_BACKEND` | oui | `postgres`, `firestore` | tous |
-| `DATABASE_URL` | si `postgres` | `postgresql://genarchi:***@db-primary.p2.genarchi.internal:5432/genarchi` | tous |
-| `FIRESTORE_PROJECT` | si `firestore` | `genarchi-p3` | tous |
-| `FIRESTORE_DATABASE` | non | `(default)` | tous |
-| `BLOB_BACKEND` | oui | `fs`, `gcs` | api, émission |
-| `BLOB_FS_ROOT` | si `fs` | `/mnt/tickets` | api, émission |
-| `BLOB_GCS_BUCKET` | si `gcs` | `genarchi-p3-tickets` | api, émission |
-| `EVENTS_BACKEND` | oui | `none`, `pubsub` | api, worker |
-| `PUBSUB_PROJECT` | si `pubsub` | `genarchi-p3` | api, worker |
-| `PUBSUB_TOPIC_TICKET_PURCHASED` | si `pubsub` | `ticket-purchased` | api, sweeper |
-| `PUBSUB_TOPIC_TICKET_ISSUED` | si `pubsub` | `ticket-issued` | worker |
-| `ADMIN_TOKEN` | oui | secret | api |
-| `STAFF_TOKEN` | oui | secret | api |
-| `CHAOS_ENABLED` | non | `false` (défaut), `true` en campagne de test | api, worker |
-| `CHAOS_FORCE_UNREADY` | non | `false` (défaut). `true` : `/readyz` renvoie toujours 503 (simulation de perte de région, test T4) | api |
-| `INSTANCE_NAME` | P2 | `app-01` | `/version`, logs |
-| `ZONE` | P2 | `europe-west9-a` | `/version` |
-| `REGION` | P3 | `europe-west1` | `/version` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | non | vide = pas d'export | tous |
-| `OTEL_SERVICE_NAME` | non | `genarchi-api` | tous |
-| `FIRESTORE_EMULATOR_HOST` | local | `firestore:8080` | local |
-| `PUBSUB_EMULATOR_HOST` | local | `pubsub:8085` | local |
+| Variable | Obligatoire | Valeurs / exemple |
+|---|---|---|
+| `PLATFORM` | oui | `local`, `p2`, `p3` |
+| `PORT` | non | `8080` |
+| `LOG_LEVEL` | non | `INFO` |
+| `PUBLIC_BASE_URL` | oui | `https://p3.genarchi.3istor.com` |
+| `DATA_BACKEND` | oui | `postgres`, `firestore`, `memory` (tests) |
+| `DATABASE_URL` | si `postgres` | `postgresql://genarchi:***@db.p2.genarchi.internal:5432/genarchi` |
+| `FIRESTORE_PROJECT` | si `firestore` | `genarchi-p3` |
+| `FIRESTORE_DATABASE` | non | `(default)` |
+| `BLOB_BACKEND` | oui | `fs`, `gcs`, `memory` (tests) |
+| `BLOB_FS_ROOT` | si `fs` | `/mnt/tickets` |
+| `BLOB_GCS_BUCKET` | si `gcs` | `genarchi-p3-tickets` |
+| `EVENTS_BACKEND` | oui | `none`, `rabbitmq`, `pubsub` |
+| `AMQP_URLS` | si `rabbitmq` | `amqp://genarchi:***@mq-1:5672/,amqp://genarchi:***@mq-2:5672/` (essayés dans l'ordre) |
+| `PUBSUB_PROJECT` | si `pubsub` | `genarchi-p3` |
+| `PUBSUB_TOPIC_TICKET_ISSUED` | si `pubsub` | `ticket-issued` |
+| `ADMIN_TOKEN` | oui | secret |
+| `STAFF_TOKEN` | oui | secret |
+| `CHAOS_ENABLED` | non | `false` (défaut) |
+| `CHAOS_FORCE_UNREADY` | non | `false` (défaut) ; `true` : `/readyz` renvoie toujours 503 (perte de région simulée, T4) |
+| `INSTANCE_NAME` | non | `app-1a` (P2) ; sinon `K_REVISION` ou le nom d'hôte |
+| `ZONE` / `REGION` | non | `europe-west9-a` (P2) / `europe-west1` (P3) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | non | vide = pas d'export |
+| `FIRESTORE_EMULATOR_HOST`, `PUBSUB_EMULATOR_HOST` | local | `localhost:8681`, `localhost:8682` |
 
-Exemples complets : [`env.local.example`](env.local.example), [`env.p2.example`](env.p2.example), [`env.p3.example`](env.p3.example).
+Exemples : [`env.local.example`](env.local.example), [`env.p2.example`](env.p2.example), [`env.p3.example`](env.p3.example).
