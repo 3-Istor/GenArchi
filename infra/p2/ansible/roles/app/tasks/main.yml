@@ -1,0 +1,99 @@
+- name: Compte système de l'app (uid fixe, partagé avec le NAS)
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    uid: "{{ app_uid }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ app_root }}"
+    create_home: false
+
+- name: Dossiers
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: ["{{ app_root }}", "{{ app_root }}/releases", "{{ app_root }}/bin", /etc/genarchi]
+
+- name: Copier la wheel et les dépendances figées
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ app_root }}/releases/"
+    mode: "0644"
+  loop: ["{{ app_wheel }}", "{{ app_dist }}/requirements.txt"]
+  register: app_release_files
+
+- name: Virtualenv de cette version
+  ansible.builtin.command: python3 -m venv {{ app_root }}/venv-{{ app_version }}
+  args:
+    creates: "{{ app_root }}/venv-{{ app_version }}/bin/python"
+
+- name: Cette version est-elle déjà installée ?
+  ansible.builtin.stat:
+    path: "{{ app_root }}/venv-{{ app_version }}/.genarchi-installed"
+  register: app_venv_marker
+
+- name: Installer les dépendances (empreintes vérifiées) puis l'app
+  when: app_release_files.changed or not (app_venv_marker.stat.exists)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    v={{ app_root }}/venv-{{ app_version }}
+    "$v/bin/pip" install --quiet --require-hashes -r {{ app_root }}/releases/requirements.txt
+    "$v/bin/pip" install --quiet --no-deps --force-reinstall {{ app_root }}/releases/{{ app_wheel | basename }}
+    touch "$v/.genarchi-installed"
+  args:
+    executable: /bin/bash
+  changed_when: true
+  notify: Redémarrer l'app
+
+- name: Basculer le lien « current » sur cette version
+  ansible.builtin.file:
+    src: "{{ app_root }}/venv-{{ app_version }}"
+    dest: "{{ app_root }}/current"
+    state: link
+    force: true
+  notify: Redémarrer l'app
+
+- name: Configuration (variables d'environnement, contrat d'exécution partie C)
+  ansible.builtin.template:
+    src: genarchi.env.j2
+    dest: "{{ app_env_file }}"
+    mode: "0600"
+  no_log: true
+  notify: Redémarrer l'app
+
+- name: Commande d'exploitation (charge l'environnement, utilisée par les runbooks)
+  ansible.builtin.copy:
+    dest: "{{ app_root }}/bin/genarchi-env"
+    mode: "0750"
+    content: |
+      #!/bin/sh
+      # Usage : sudo {{ app_root }}/bin/genarchi-env <sous-commande>   (ex. seed, migrate, issue-pending)
+      set -a; . {{ app_env_file }}; set +a
+      exec setpriv --reuid={{ app_user }} --regid={{ app_user }} --init-groups {{ app_root }}/current/bin/genarchi "$@"
+
+- name: Unités systemd de l'API et du consommateur
+  ansible.builtin.template:
+    src: genarchi.service.j2
+    dest: "/etc/systemd/system/{{ item }}.service"
+    mode: "0644"
+  vars:
+    command: "{{ {'genarchi-api': 'serve-api', 'genarchi-consumer': 'consume'}[item] }}"
+  loop: "{{ app_services }}"
+  notify: Redémarrer l'app
+
+- name: Démarrer les services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ app_services }}"
+
+- name: Garder les trois dernières versions
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cd {{ app_root }}
+    ls -dt venv-* | tail -n +4 | xargs -r rm -rf
+  args:
+    executable: /bin/bash
+  changed_when: false

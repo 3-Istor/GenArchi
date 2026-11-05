@@ -1,0 +1,4 @@
+- name: Redémarrer RabbitMQ
+  ansible.builtin.systemd_service:
+    name: rabbitmq-server
+    state: restarted

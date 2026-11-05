@@ -1,0 +1,24 @@
+# nfs_enabled: false seulement dans le labo local (conteneurs sans NFS noyau) : dossier local à la place.
+- name: Dossier local des QR (labo sans NFS)
+  when: not (nfs_enabled | default(true))
+  ansible.builtin.file:
+    path: "{{ tickets_mount }}"
+    state: directory
+    owner: "{{ app_uid }}"
+    group: "{{ app_uid }}"
+    mode: "0750"
+
+- name: Installer le client NFS
+  when: nfs_enabled | default(true)
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+
+- name: "Monter le NAS via son IP virtuelle (montage « hard » : en cas de bascule, les écritures attendent)"
+  when: nfs_enabled | default(true)
+  ansible.posix.mount:
+    path: "{{ tickets_mount }}"
+    src: "{{ nas_host }}:{{ nas_export }}"
+    fstype: nfs4
+    opts: nfsvers=4.2,hard,timeo=150,retrans=3,noatime,_netdev
+    state: mounted

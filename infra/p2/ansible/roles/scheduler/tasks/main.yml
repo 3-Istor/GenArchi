@@ -1,0 +1,37 @@
+# Ordonnanceur de la P2 : timers systemd (à la place d'un Rundeck, voir ADR). Un seul serveur : SPOF assumé,
+# le rattrapage est un filet de sécurité, la file RabbitMQ émet les billets en temps normal.
+- name: Rattrapage des billets en attente
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/genarchi-issue-pending.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=GenArchi : émettre les billets restés en attente
+      RequiresMountsFor={{ tickets_mount }}
+      [Service]
+      Type=oneshot
+      User={{ app_user }}
+      EnvironmentFile={{ app_env_file }}
+      ExecStart={{ app_root }}/current/bin/genarchi issue-pending --older-than 120 --limit 500
+      TimeoutStartSec=240
+
+- name: Toutes les 5 minutes
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/genarchi-issue-pending.timer
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=GenArchi : rattrapage toutes les 5 min
+      [Timer]
+      OnCalendar=*:0/5
+      RandomizedDelaySec=20
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+
+- name: Activer le timer
+  ansible.builtin.systemd_service:
+    name: genarchi-issue-pending.timer
+    enabled: true
+    state: started
+    daemon_reload: true

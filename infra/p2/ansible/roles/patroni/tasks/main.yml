@@ -1,0 +1,78 @@
+- name: Dossier de configuration de postgresql-common
+  ansible.builtin.file:
+    path: /etc/postgresql-common/createcluster.d
+    state: directory
+    mode: "0755"
+
+- name: Ne pas créer le cluster PostgreSQL par défaut de Debian (Patroni le crée)
+  ansible.builtin.copy:
+    dest: /etc/postgresql-common/createcluster.d/genarchi.conf
+    content: "create_main_cluster = false\n"
+    mode: "0644"
+
+- name: Installer PostgreSQL 17 et Patroni
+  ansible.builtin.apt:
+    name: [postgresql-17, postgresql-client-17, patroni, python3-etcd, python3-psycopg2]
+    state: present
+
+- name: Le dossier de données appartient à postgres (disque de données monté par le rôle common)
+  ansible.builtin.file:
+    path: /var/lib/postgresql
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+
+- name: Configurer Patroni
+  ansible.builtin.template:
+    src: patroni.yml.j2
+    dest: /etc/patroni/config.yml
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  notify: Recharger Patroni
+
+- name: Démarrer Patroni
+  ansible.builtin.systemd_service:
+    name: patroni
+    enabled: true
+    state: started
+
+- name: Attendre que le cluster ait un primaire
+  ansible.builtin.uri:
+    url: "http://{{ p2_hosts[inventory_hostname] }}:8008/cluster"
+    return_content: true
+  register: patroni_cluster
+  retries: 30
+  delay: 5
+  until: patroni_cluster.status == 200 and (patroni_cluster.json.members | selectattr('role', 'equalto', 'leader') | list | length) == 1
+
+- name: Ce serveur est-il le primaire ?
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8008/primary"
+    status_code: [200, 503]
+  register: patroni_primary
+
+- name: Comptes et base de l'application (sur le primaire seulement)
+  when: patroni_primary.status == 200
+  become: true
+  become_user: postgres
+  block:
+    - name: Rôles
+      community.postgresql.postgresql_user:
+        name: "{{ item.name }}"
+        password: "{{ item.password }}"
+        role_attr_flags: "{{ item.flags }}"
+      loop:
+        - { name: "{{ db_user }}", password: "{{ secrets.app_db }}", flags: "LOGIN" }
+        - { name: barman, password: "{{ secrets.barman }}", flags: "LOGIN,SUPERUSER" }
+        - { name: streaming_barman, password: "{{ secrets.streaming_barman }}", flags: "LOGIN,REPLICATION" }
+      loop_control:
+        label: "{{ item.name }}"
+      no_log: true
+
+    - name: Base de l'application
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        owner: "{{ db_user }}"
+        encoding: UTF-8

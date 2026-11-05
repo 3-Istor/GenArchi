@@ -1,0 +1,107 @@
+- name: Installer RabbitMQ
+  ansible.builtin.apt:
+    name: rabbitmq-server
+    state: present
+
+- name: Ce nœud a-t-il déjà rejoint le cluster ?
+  ansible.builtin.stat:
+    path: /var/lib/rabbitmq/.genarchi-cluster
+  register: rabbitmq_joined
+
+- name: Première configuration (le paquet démarre un nœud isolé, avec son propre cookie)
+  when: not rabbitmq_joined.stat.exists
+  block:
+    - name: Arrêter le nœud isolé
+      ansible.builtin.systemd_service:
+        name: rabbitmq-server
+        state: stopped
+
+    - name: Effacer son état (rien n'y est encore stocké)
+      ansible.builtin.file:
+        path: /var/lib/rabbitmq/mnesia
+        state: absent
+
+- name: Cookie Erlang commun aux trois nœuds
+  ansible.builtin.copy:
+    dest: /var/lib/rabbitmq/.erlang.cookie
+    content: "{{ secrets.erlang_cookie }}"
+    owner: rabbitmq
+    group: rabbitmq
+    mode: "0400"
+  no_log: true
+  notify: Redémarrer RabbitMQ
+
+- name: Configuration du cluster (découverte par liste fixe, un nœud par zone)
+  ansible.builtin.copy:
+    dest: /etc/rabbitmq/rabbitmq.conf
+    mode: "0644"
+    content: |
+      # Géré par Ansible (rôle rabbitmq)
+      cluster_formation.peer_discovery_backend = classic_config
+      # Les trois nœuds démarrent en même temps : chacun attend les autres jusqu'à 2 min.
+      cluster_formation.discovery_retry_limit = 60
+      cluster_formation.discovery_retry_interval = 2000
+      {% for h in groups['rabbitmq'] %}
+      cluster_formation.classic_config.nodes.{{ loop.index }} = rabbit@{{ h }}
+      {% endfor %}
+      cluster_partition_handling = pause_minority
+      listeners.tcp.default = 5672
+      management.tcp.port = 15672
+      loopback_users.guest = true
+      # Les files quorum (tickets.issue, déclarée par l'app) sont répliquées par défaut sur tous les nœuds.
+  notify: Redémarrer RabbitMQ
+
+- name: Activer l'interface d'administration (joignable via le bastion)
+  ansible.builtin.copy:
+    dest: /etc/rabbitmq/enabled_plugins
+    content: "[rabbitmq_management].\n"
+    mode: "0644"
+  notify: Redémarrer RabbitMQ
+
+- name: Appliquer la configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Démarrer RabbitMQ
+  ansible.builtin.systemd_service:
+    name: rabbitmq-server
+    enabled: true
+    state: started
+
+- name: Attendre que les trois nœuds forment le cluster
+  ansible.builtin.command: rabbitmqctl cluster_status --formatter json
+  register: rabbitmq_status
+  changed_when: false
+  retries: 24
+  delay: 5
+  until: rabbitmq_status.rc == 0 and (rabbitmq_status.stdout | from_json).running_nodes | length == groups['rabbitmq'] | length
+
+- name: Marquer le nœud comme membre du cluster
+  ansible.builtin.copy:
+    dest: /var/lib/rabbitmq/.genarchi-cluster
+    content: "membre du cluster genarchi\n"
+    mode: "0644"
+
+- name: Comptes (définis une fois, répliqués par le cluster)
+  run_once: true
+  block:
+    - name: Compte de l'application et compte d'administration
+      community.rabbitmq.rabbitmq_user:
+        user: "{{ item.user }}"
+        password: "{{ item.password }}"
+        tags: "{{ item.tags }}"
+        vhost: /
+        configure_priv: ".*"
+        read_priv: ".*"
+        write_priv: ".*"
+        update_password: always
+      loop:
+        - { user: genarchi, password: "{{ secrets.rabbitmq_app }}", tags: "" }
+        - { user: admin, password: "{{ secrets.rabbitmq_admin }}", tags: administrator }
+      loop_control:
+        label: "{{ item.user }}"
+      no_log: true
+
+    - name: Supprimer le compte invité
+      community.rabbitmq.rabbitmq_user:
+        user: guest
+        state: absent

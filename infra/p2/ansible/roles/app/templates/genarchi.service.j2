@@ -1,0 +1,26 @@
+# Géré par Ansible (rôle app)
+[Unit]
+Description=GenArchi {{ command }}
+After=network-online.target {{ tickets_mount | regex_replace('^/', '') | replace('/', '-') }}.mount
+Wants=network-online.target
+RequiresMountsFor={{ tickets_mount }}
+
+[Service]
+User={{ app_user }}
+Group={{ app_user }}
+EnvironmentFile={{ app_env_file }}
+ExecStart={{ app_root }}/current/bin/genarchi {{ command }}
+Restart=always
+RestartSec=2
+# SIGTERM : l'app termine les requêtes en cours en moins de 10 s (contrat A5).
+TimeoutStopSec=15
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths={{ tickets_mount }}
+CapabilityBoundingSet=
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

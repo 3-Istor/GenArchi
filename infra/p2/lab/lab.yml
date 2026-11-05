@@ -1,0 +1,37 @@
+# Labo P2 : `make p2-lab`. Joue la vraie configuration (site.yml) sur les conteneurs, puis des vérifications.
+- name: IP virtuelle PostgreSQL du labo (HAProxy, sonde /primary de Patroni)
+  hosts: lab_vip
+  become: true
+  tasks:
+    - name: Installer HAProxy
+      ansible.builtin.apt:
+        name: haproxy
+        update_cache: true
+    - name: Configurer HAProxy
+      ansible.builtin.copy:
+        dest: /etc/haproxy/haproxy.cfg
+        mode: "0644"
+        content: |
+          global
+            maxconn 1000
+          defaults
+            mode tcp
+            timeout connect 3s
+            timeout client 30m
+            timeout server 30m
+          listen postgres
+            bind *:5432
+            option httpchk GET /primary
+            http-check expect status 200
+            default-server inter 3s fall 2 rise 2 on-marked-down shutdown-sessions
+          {% for h in groups['db'] %}
+            server {{ h }} {{ p2_hosts[h] }}:5432 check port 8008
+          {% endfor %}
+    - name: Démarrer HAProxy
+      ansible.builtin.systemd_service:
+        name: haproxy
+        state: restarted
+        enabled: true
+
+- name: Configuration réelle de la P2
+  ansible.builtin.import_playbook: ../ansible/site.yml

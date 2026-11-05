@@ -1,0 +1,59 @@
+- name: Mettre à jour l'index des paquets
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Paquets de base
+  ansible.builtin.apt:
+    name: [chrony, curl, ca-certificates, jq, python3-venv, acl, rsync, gnupg]
+    state: present
+
+- name: Fuseau horaire UTC
+  community.general.timezone:
+    name: Etc/UTC
+
+- name: Résolution des serveurs de la P2 sans dépendre du DNS (Patroni, etcd, RabbitMQ)
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} GenArchi P2"
+    unsafe_writes: true  # /etc/hosts est un montage dans les conteneurs du labo
+    block: |
+      {{ db_vip }} db.{{ internal_domain }}
+      {{ nas_vip }} nas.{{ internal_domain }}
+      {% for name, ip in p2_hosts | dictsort %}
+      {{ ip }} {{ name }}.{{ internal_domain }} {{ name }}
+      {% endfor %}
+
+- name: Dossier de configuration de journald
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Journal systemd persistant, transmis à rsyslog
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/genarchi.conf
+    content: |
+      [Journal]
+      Storage=persistent
+      ForwardToSyslog=yes
+      SystemMaxUse=500M
+    mode: "0644"
+  notify: Redémarrer journald
+
+- name: Disque de données
+  when: data_mount is defined and data_mount
+  block:
+    - name: Créer le système de fichiers (seulement si le disque est vierge)
+      community.general.filesystem:
+        dev: /dev/disk/by-id/google-data
+        fstype: ext4
+        opts: -L data
+
+    - name: Monter le disque de données
+      ansible.posix.mount:
+        path: "{{ data_mount }}"
+        src: LABEL=data
+        fstype: ext4
+        opts: defaults,noatime,nofail
+        state: mounted

@@ -1,6 +1,6 @@
 # Décisions d’architecture
 
-**Aucune ADR technique n’est enregistrée ou acceptée au 2 novembre 2026.** Les exemples du kickoff ne valent pas décision.
+Seule l’ADR 0001 est acceptée (fournisseur, retour du coaching du 3 novembre). Les autres sont des propositions des tech leads, à valider. Les exemples du kickoff ne valent pas décision.
 
 ## Créer et faire évoluer une ADR
 
@@ -16,5 +16,22 @@ Statuts autorisés : **proposé**, **accepté**, **rejeté**, **remplacé**. Le 
 
 | Numéro | Sujet | Statut | Date de validation | Preuve de validation |
 | --- | --- | --- | --- | --- |
+| [0001](0001-fournisseur-gcp.md) | Fournisseur cloud : Google Cloud | accepté | 2026-11-03 | Coaching 1, rapporté par Brian Perret le 2026-11-04 (restitution à rédiger) |
+| [0002](0002-p2-deux-zones-bascule-manuelle.md) | P2 : deux zones, bascule manuelle | proposé | — | — |
+| [0003](0003-p3-cloud-run-services.md) | P3 : Cloud Run services plutôt que GKE ou Cloud Run functions | proposé | — | — |
+| [0004](0004-p3-drp-permanent-rollback-auto.md) | P3 : test de DRP permanent et rollback automatique | proposé | — | — |
+| [0005](0005-p3-firestore-eur3.md) | P3 : Firestore multi-région eur3 | proposé | — | — |
+| [0006](0006-p2-equipements-reseau-manages.md) | P2 : équipements réseau managés | proposé | — | — |
+| [0007](0007-app-python-fastapi.md) | Langage de l'application : Python + FastAPI | proposé | — | — |
+| [0008](0008-app-billetterie.md) | Application : billetterie, un seul code, deux jeux d'adaptateurs | proposé | — | — |
+| [0009](0009-p2-sauvegarde-pgdump-snapshots.md) | P2 : sauvegarde par pg_dump et snapshots de disques | proposé | — | — |
+| [0010](0010-p2-build-automatise-run-manuel.md) | P2 : build automatisé, run manuel | proposé | — | — |
+| [0011](0011-p3-sweeper.md) | P3 : rattrapage des publications perdues par un sweeper | proposé | — | — |
+| [0012](0012-p2-supervision-zabbix.md) | P2 : supervision Zabbix | proposé | — | — |
+| [0013](0013-regions.md) | Régions | proposé | — | — |
+| [0014](0014-outillage-opentofu-nix-mise.md) | Outillage : OpenTofu, Ansible, Nix et mise | proposé | — | — |
+| [0015](0015-p2-clusters-etat-de-l-art.md) | P2 : clusters middleware « état de l'art » dans les VM | proposé | — | — |
+| [0016](0016-p3-evenement-emis-par-firestore.md) | P3 : l'événement « billet créé » est émis par Firestore | proposé | — | — |
+| [0017](0017-p2-substitutions-outils.md) | P2 : substitutions d'outils (Apache + ModSecurity, rsyslog, timers) | proposé | — | — |
 
 Sujets à instruire après coaching : application commune, environnements P2/P3, persistance, architecture de chaque plateforme et protocole de résilience. Cette liste ne préjuge d’aucun choix.

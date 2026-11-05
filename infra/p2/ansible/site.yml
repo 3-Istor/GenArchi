@@ -1,0 +1,43 @@
+# Construit toute la P2 : `make p2-configure`. Idempotent : on peut le relancer sans risque.
+- name: Socle commun (paquets, /etc/hosts, disque de données, journaux, agent de supervision)
+  hosts: all
+  become: true
+  roles: [common, rsyslog_client, zabbix_agent]
+
+- name: Supervision (Zabbix) et journaux centralisés (rsyslog)
+  hosts: zabbix
+  become: true
+  roles: [monitoring]
+
+- name: Quorum etcd (db-1, db-2, witness)
+  hosts: etcd
+  become: true
+  roles: [etcd]
+
+- name: PostgreSQL 17 + Patroni
+  hosts: db
+  become: true
+  roles: [patroni]
+
+- name: RabbitMQ 3 nœuds (mq-1, mq-2, witness)
+  hosts: rabbitmq
+  become: true
+  roles: [rabbitmq]
+
+- name: NAS actif/passif (NFS sur disque régional)
+  hosts: nas
+  become: true
+  roles: [nas]
+
+- name: Sauvegarde PostgreSQL (Barman)
+  hosts: barman
+  become: true
+  roles: [barman]
+
+- name: Reverse proxies Apache + ModSecurity
+  hosts: reverse_proxy
+  become: true
+  roles: [reverse_proxy]
+
+- name: Application
+  ansible.builtin.import_playbook: app.yml

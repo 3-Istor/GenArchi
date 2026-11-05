@@ -1,0 +1,588 @@
+openapi: 3.1.0
+info:
+  title: GenArchi Billetterie API
+  version: 0.2.0
+  summary: API HTTP de la billetterie, identique sur Platform 2 et Platform 3.
+  description: |
+    Contrat 0.2.0. Même API, même code, deux plateformes.
+
+    - Les erreurs suivent RFC 9457 (`application/problem+json`) avec un champ `code` stable.
+    - Les dates sont en RFC 3339 UTC.
+    - Les identifiants sont des chaînes opaques.
+    - Rôles : public (anonyme), `staff` (contrôle d'entrée), `admin` (gestion + hooks de test).
+servers:
+  - url: http://localhost:8080
+    description: Local (docker compose)
+  - url: https://{host}
+    description: Platform 2 ou Platform 3 (sortie Terraform `base_url`)
+    variables:
+      host:
+        default: example.invalid
+# Par défaut les opérations sont publiques ; les opérations protégées déclarent leur propre `security`.
+security: []
+tags:
+  - name: ops
+    description: Sondes et identité de l'instance (utilisées par les load balancers et les tests)
+  - name: events
+    description: Consultation des événements
+  - name: orders
+    description: Achat de billets
+  - name: tickets
+    description: Billets, QR codes et contrôle d'entrée
+  - name: admin
+    description: Gestion, protégée par le jeton admin
+  - name: internal
+    description: |
+      Points d'entrée réservés à la plateforme et aux tests.
+      `/internal/events/ticket-created` n'existe que sur le processus `worker`, qui n'est pas derrière le load balancer.
+      `/internal/chaos` passe par le load balancer mais exige le jeton admin et `CHAOS_ENABLED=true`.
+
+paths:
+  /healthz:
+    get:
+      tags: [ops]
+      operationId: getHealth
+      summary: Liveness. Répond 200 si le processus tourne, sans vérifier les dépendances.
+      responses:
+        "200":
+          description: Processus vivant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /readyz:
+    get:
+      tags: [ops]
+      operationId: getReadiness
+      summary: Readiness. 200 seulement si la base est joignable (timeout 1 s). Utilisée par les health checks des load balancers.
+      responses:
+        "200":
+          description: Prêt à recevoir du trafic
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+        "503":
+          description: Pas prêt (dépendance KO ou mode chaos `unready`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+
+  /version:
+    get:
+      tags: [ops]
+      operationId: getVersion
+      summary: Identité de l'instance qui a servi la requête. Sert aux démos (quelle région / quelle VM a répondu ?).
+      responses:
+        "200":
+          description: Version et localisation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VersionInfo" }
+
+  /events:
+    get:
+      tags: [events]
+      operationId: listEvents
+      summary: Liste les événements
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/EventStatus" }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          description: Curseur opaque renvoyé par la page précédente
+          schema: { type: string }
+      responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
+        "200":
+          description: Page d'événements, triés par `starts_at` croissant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventPage" }
+    post:
+      tags: [admin]
+      operationId: createEvent
+      summary: Crée un événement
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventCreate" }
+      responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
+        "201":
+          description: Créé
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /events/{eventId}:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      tags: [events]
+      operationId: getEvent
+      summary: Détail d'un événement
+      responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
+        "200":
+          description: L'événement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{eventId}/orders:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      tags: [orders]
+      operationId: createOrder
+      summary: Achète des billets (atomique, idempotent)
+      description: |
+        Décrémente le stock et crée commande + billets `pending` dans une seule transaction (invariant I1).
+        Rejouer la même `Idempotency-Key` renvoie la commande existante avec `200` (invariant I2).
+        Après commit, un événement `fr.genarchi.ticket.purchased.v1` est émis (P3) ou les billets
+        sont pris en charge par le batch d'émission (P2).
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Clé unique générée par le client (UUID recommandé), 8 à 128 caractères
+          schema: { type: string, minLength: 8, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderCreate" }
+      responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
+        "201":
+          description: Commande créée
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "200":
+          description: Rejeu d'une clé déjà utilisée avec le même corps, commande existante renvoyée
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "400":
+          description: En-tête `Idempotency-Key` manquant ou invalide (`code` = `idempotency_key_required`)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            Achat impossible. `code` vaut :
+            - `sold_out` : plus aucune place
+            - `insufficient_stock` : moins de places que demandé (`remaining` indiqué dans `detail`)
+            - `sales_not_open` : avant `sales_open_at`
+            - `event_closed` : après `starts_at`
+            - `idempotency_conflict` : clé déjà utilisée avec un corps différent
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /orders/{orderId}:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [orders]
+      operationId: getOrder
+      summary: Détail d'une commande et de ses billets
+      responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
+        "200":
+          description: La commande
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tickets/{ticketId}:
+    parameters:
+      - $ref: "#/components/parameters/TicketId"
+    get:
+      tags: [tickets]
+      operationId: getTicket
+      summary: Détail d'un billet
+      responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
+        "200":
+          description: Le billet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ticket" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tickets/{ticketId}/qr:
+    parameters:
+      - $ref: "#/components/parameters/TicketId"
+    get:
+      tags: [tickets]
+      operationId: getTicketQr
+      summary: Image PNG du QR code
+      description: |
+        P2 : l'API lit le fichier sur le partage NFS et le renvoie (200).
+        P3 : l'API renvoie une redirection 302 vers une URL signée Cloud Storage valable 15 min.
+        Les clients doivent suivre les redirections.
+      responses:
+        "200":
+          description: Image PNG
+          content:
+            image/png:
+              schema: { type: string, contentMediaType: image/png }
+        "302":
+          description: Redirection vers une URL signée
+          headers:
+            Location: { schema: { type: string, format: uri } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Billet pas encore émis (`code` = `ticket_not_issued`). Réessayer plus tard.
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /tickets/{ticketId}/scan:
+    parameters:
+      - $ref: "#/components/parameters/TicketId"
+    post:
+      tags: [tickets]
+      operationId: scanTicket
+      summary: Contrôle d'entrée (idempotent, invariant I3)
+      security: [{ staffToken: [] }, { adminToken: [] }]
+      responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
+        "200":
+          description: Premier scan, billet validé
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ticket" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`already_scanned` (avec `scanned_at` en extension) ou `ticket_not_issued`"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /t/{ticketId}:
+    parameters:
+      - $ref: "#/components/parameters/TicketId"
+    get:
+      tags: [tickets]
+      operationId: ticketLanding
+      summary: Cible du QR code. Page HTML minimale affichant le billet.
+      responses:
+        "200":
+          description: Page HTML
+          content:
+            text/html:
+              schema: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/events/{eventId}/stats:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    get:
+      tags: [admin]
+      operationId: getEventStats
+      summary: Compteurs de ventes et de scans d'un événement
+      security: [{ adminToken: [] }]
+      responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
+        "200":
+          description: Compteurs de l'événement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventStats" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /internal/events/ticket-created:
+    post:
+      tags: [internal]
+      operationId: ticketCreatedEvent
+      summary: Worker P3 — CloudEvent Firestore « document billet créé », livré par Eventarc
+      description: |
+        Exposé uniquement par le processus `worker`, en P3, derrière l'IAM Cloud Run (pas derrière le LB).
+        Mode binaire CloudEvents : l'identifiant du billet est lu dans `ce-subject`
+        (`documents/tickets/{id}`) ; le mode structuré (champ `subject`) est aussi accepté.
+        Idempotent (I5) : une relivraison ne change rien. Toute réponse autre que 2xx provoque une relivraison.
+      parameters:
+        - { name: ce-subject, in: header, required: false, schema: { type: string } }
+        - { name: ce-type, in: header, required: false, schema: { type: string } }
+        - { name: ce-id, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "204": { description: "Traité, déjà traité, ou événement sans billet (ignoré)" }
+        "503": { description: "Dépendance indisponible : Eventarc relivrera" }
+
+  /internal/chaos:
+    post:
+      tags: [internal]
+      operationId: triggerChaos
+      summary: Hook de test pour le protocole T2. Actif seulement si `CHAOS_ENABLED=true`.
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChaosRequest" }
+      responses:
+        "202": { description: Action programmée (exécutée après l'envoi de la réponse) }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: Chaos désactivé sur cette instance }
+
+components:
+  securitySchemes:
+    adminToken:
+      type: http
+      scheme: bearer
+      description: Valeur de `ADMIN_TOKEN` (secret de plateforme)
+    staffToken:
+      type: http
+      scheme: bearer
+      description: Valeur de `STAFF_TOKEN` (secret de plateforme)
+
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: string }
+    TicketId:
+      name: ticketId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    Unavailable:
+      description: >-
+        Dépendance momentanément indisponible, par exemple pendant une bascule de base (`code` = `unavailable`).
+        En-tête `Retry-After`. Rejouer un achat avec la même `Idempotency-Key` est sans risque.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Ressource introuvable (`code` = `not_found`)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Jeton absent ou invalide (`code` = `unauthorized`)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ValidationError:
+      description: Corps invalide (`code` = `validation_error`, détails dans `errors`)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
+
+    Readiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ready, not_ready] }
+        checks:
+          type: object
+          additionalProperties: { type: string, enum: [ok, fail] }
+          examples: [{ database: ok }]
+
+    VersionInfo:
+      type: object
+      required: [app_version, contract_version, platform, process, instance]
+      properties:
+        app_version: { type: string, examples: ["1.4.2+gabc1234"] }
+        contract_version: { type: string, examples: ["0.2.0"] }
+        platform: { type: string, enum: [local, p2, p3] }
+        process: { type: string, enum: [api, worker] }
+        region: { type: [string, "null"], examples: [europe-west1] }
+        zone: { type: [string, "null"], examples: [europe-west9-a] }
+        instance: { type: string, description: "Nom de VM en P2, révision Cloud Run + id d'instance en P3" }
+        data_backend: { type: string, enum: [postgres, firestore, memory] }
+
+    EventStatus:
+      type: string
+      enum: [scheduled, on_sale, sold_out, closed]
+
+    EventCreate:
+      type: object
+      additionalProperties: false
+      required: [name, venue, starts_at, sales_open_at, capacity, price_cents]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        venue: { type: string, minLength: 1, maxLength: 120 }
+        starts_at: { type: string, format: date-time }
+        sales_open_at: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1, maximum: 100000 }
+        price_cents: { type: integer, minimum: 0 }
+
+    Event:
+      type: object
+      required: [id, name, venue, starts_at, sales_open_at, capacity, remaining, price_cents, currency, status, created_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        venue: { type: string }
+        starts_at: { type: string, format: date-time }
+        sales_open_at: { type: string, format: date-time }
+        capacity: { type: integer }
+        remaining: { type: integer, minimum: 0 }
+        price_cents: { type: integer }
+        currency: { type: string, const: EUR }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        created_at: { type: string, format: date-time }
+
+    EventPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Event" }
+        next_cursor: { type: [string, "null"] }
+
+    OrderCreate:
+      type: object
+      additionalProperties: false
+      required: [buyer_email, quantity]
+      properties:
+        buyer_email: { type: string, format: email, maxLength: 254 }
+        quantity: { type: integer, minimum: 1, maximum: 4 }
+
+    Order:
+      type: object
+      required: [id, event_id, buyer_email, quantity, amount_cents, status, tickets, created_at]
+      properties:
+        id: { type: string }
+        event_id: { type: string }
+        buyer_email: { type: string, format: email }
+        quantity: { type: integer }
+        amount_cents: { type: integer }
+        status: { type: string, const: confirmed }
+        tickets:
+          type: array
+          items: { $ref: "#/components/schemas/Ticket" }
+        created_at: { type: string, format: date-time }
+
+    TicketStatus:
+      type: string
+      enum: [pending, issued, scanned]
+
+    Ticket:
+      type: object
+      required: [id, order_id, event_id, status]
+      properties:
+        id: { type: string }
+        order_id: { type: string }
+        event_id: { type: string }
+        status: { $ref: "#/components/schemas/TicketStatus" }
+        qr_url:
+          type: [string, "null"]
+          description: "`/tickets/{id}/qr` une fois émis, sinon null"
+        issued_at: { type: [string, "null"], format: date-time }
+        scanned_at: { type: [string, "null"], format: date-time }
+
+    EventStats:
+      type: object
+      required: [event_id, capacity, sold, remaining, tickets]
+      properties:
+        event_id: { type: string }
+        capacity: { type: integer }
+        sold: { type: integer }
+        remaining: { type: integer }
+        tickets:
+          type: object
+          required: [pending, issued, scanned]
+          properties:
+            pending: { type: integer }
+            issued: { type: integer }
+            scanned: { type: integer }
+
+    ChaosRequest:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [crash, unready, latency]
+          description: |
+            - `crash` : le processus s'arrête avec un code non nul
+            - `unready` : `/readyz` renvoie 503 pendant `duration_s`
+            - `latency` : ajoute `latency_ms` à chaque requête pendant `duration_s`
+        duration_s: { type: integer, minimum: 1, maximum: 600, default: 60 }
+        latency_ms: { type: integer, minimum: 1, maximum: 10000, default: 1000 }
+
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details, avec un `code` machine stable
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri-reference, examples: ["https://genarchi.invalid/problems/sold_out"] }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code:
+          type: string
+          enum:
+            - not_found
+            - unauthorized
+            - validation_error
+            - idempotency_key_required
+            - idempotency_conflict
+            - sold_out
+            - insufficient_stock
+            - sales_not_open
+            - event_closed
+            - ticket_not_issued
+            - already_scanned
+            - internal_error
+            - unavailable
+        scanned_at: { type: string, format: date-time, description: "Présent si `code` = `already_scanned`" }
+        remaining: { type: integer, description: "Présent si `code` = `insufficient_stock`" }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }

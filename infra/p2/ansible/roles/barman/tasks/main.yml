@@ -1,0 +1,95 @@
+- name: Installer Barman et le client PostgreSQL 17
+  ansible.builtin.apt:
+    name: [barman, barman-cli, postgresql-client-17]
+    state: present
+
+- name: Le dossier des sauvegardes appartient à barman (disque de données monté par le rôle common)
+  ansible.builtin.file:
+    path: /var/lib/barman
+    state: directory
+    owner: barman
+    group: barman
+    mode: "0750"
+
+- name: Mots de passe (fichier .pgpass)
+  ansible.builtin.copy:
+    dest: /var/lib/barman/.pgpass
+    owner: barman
+    group: barman
+    mode: "0600"
+    content: |
+      {{ db_host }}:5432:*:barman:{{ secrets.barman }}
+      {{ db_host }}:5432:replication:streaming_barman:{{ secrets.streaming_barman }}
+  no_log: true
+
+- name: "Serveur sauvegardé : le cluster, joint par son IP virtuelle (suit le primaire après une bascule)"
+  ansible.builtin.copy:
+    dest: /etc/barman.d/genarchi.conf
+    mode: "0644"
+    content: |
+      [genarchi]
+      description = "PostgreSQL P2 (Patroni) via {{ db_host }}"
+      conninfo = host={{ db_host }} user=barman dbname=postgres
+      streaming_conninfo = host={{ db_host }} user=streaming_barman
+      backup_method = postgres
+      streaming_archiver = on
+      slot_name = barman
+      create_slot = manual
+      archiver = off
+      retention_policy = RECOVERY WINDOW OF 7 DAYS
+      minimum_redundancy = 2
+      last_backup_maximum_age = 2 DAYS
+
+- name: Lancer la réception des WAL (barman cron, déjà planifié chaque minute par le paquet)
+  become: true
+  become_user: barman
+  ansible.builtin.command: barman cron
+  changed_when: false
+
+- name: Sauvegarde complète chaque nuit
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item.name }}"
+    mode: "0644"
+    content: "{{ item.content }}"
+  loop:
+    - name: barman-backup.service
+      content: |
+        [Unit]
+        Description=Barman : sauvegarde complète du cluster PostgreSQL
+        [Service]
+        Type=oneshot
+        User=barman
+        ExecStart=/usr/bin/barman backup genarchi --wait
+    - name: barman-backup.timer
+      content: |
+        [Unit]
+        Description=Barman : chaque nuit
+        [Timer]
+        OnCalendar=*-*-* 01:30:00
+        Persistent=true
+        [Install]
+        WantedBy=timers.target
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Activer la sauvegarde nocturne
+  ansible.builtin.systemd_service:
+    name: barman-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: "Supervision : `barman check` remonté à Zabbix"
+  ansible.builtin.copy:
+    dest: /etc/zabbix/zabbix_agent2.d/barman.conf
+    mode: "0644"
+    content: |
+      UserParameter=barman.check,sudo -u barman /usr/bin/barman -q check genarchi --nagios | cut -c1-200
+  notify: Redémarrer l'agent Zabbix
+
+- name: L'agent Zabbix peut lancer barman check (lecture seule)
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/zabbix-barman
+    mode: "0440"
+    content: "zabbix ALL=(barman) NOPASSWD: /usr/bin/barman -q check genarchi --nagios\n"
+    validate: visudo -cf %s

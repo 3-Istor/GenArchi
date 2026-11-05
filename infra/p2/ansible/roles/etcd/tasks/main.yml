@@ -1,0 +1,25 @@
+- name: Installer etcd
+  ansible.builtin.apt:
+    name: [etcd-server, etcd-client]
+    state: present
+
+- name: "Configurer le membre du quorum (3 membres, un par zone : DC1, DC2, témoin)"
+  ansible.builtin.template:
+    src: etcd.env.j2
+    dest: /etc/default/etcd
+    mode: "0644"
+  register: etcd_conf
+
+- name: Démarrer etcd (les trois membres en parallèle, chacun attend les autres)
+  ansible.builtin.systemd_service:
+    name: etcd
+    enabled: true
+    state: "{{ 'restarted' if etcd_conf.changed else 'started' }}"
+
+- name: Vérifier la santé du quorum
+  ansible.builtin.command: etcdctl --endpoints={{ etcd_endpoints }} endpoint health
+  register: etcd_health
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: etcd_health.rc == 0

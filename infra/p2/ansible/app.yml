@@ -1,0 +1,59 @@
+# Déploie une version de l'app : `make p2-release` (relance seulement cette partie).
+# Mise à jour serveur par serveur : Apache retire de la rotation le serveur arrêté (health check /readyz).
+- name: Construire le paquet sur le poste qui lance le déploiement
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Construire la wheel et figer les dépendances (uv.lock, avec empreintes)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rm -rf dist && uv build --wheel --out-dir dist >/dev/null
+        uv export --frozen --no-dev --extra p2 --no-emit-project --format requirements-txt > dist/requirements.txt
+        ls dist/*.whl
+      args:
+        chdir: "{{ playbook_dir }}/../../../app"
+        executable: /bin/bash
+      register: wheel
+      changed_when: true
+
+    - name: Retenir le chemin de la wheel
+      ansible.builtin.set_fact:
+        app_wheel: "{{ playbook_dir }}/../../../app/dist/{{ wheel.stdout_lines[-1] | basename }}"
+        app_dist: "{{ playbook_dir }}/../../../app/dist"
+
+- name: Préparer l'ordonnanceur et migrer le schéma (une seule fois)
+  hosts: schedulers
+  become: true
+  vars:
+    app_dist: "{{ hostvars['localhost'].app_dist }}"
+    app_wheel: "{{ hostvars['localhost'].app_wheel }}"
+  roles: [nfs_client, app, scheduler]
+  post_tasks:
+    - name: Migrer le schéma (verrou consultatif, sans effet si déjà à jour)
+      ansible.builtin.command: "{{ app_root }}/bin/genarchi-env migrate"
+      register: migrate
+      changed_when: "'\"applied\": [\"' in (migrate.stdout + migrate.stderr)"
+
+- name: Mettre à jour les serveurs d'application un par un
+  hosts: app
+  become: true
+  serial: 1
+  vars:
+    app_dist: "{{ hostvars['localhost'].app_dist }}"
+    app_wheel: "{{ hostvars['localhost'].app_wheel }}"
+    app_services: [genarchi-api, genarchi-consumer]
+  roles: [nfs_client, app]
+  post_tasks:
+    - name: Attendre que le serveur soit prêt avant de passer au suivant
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8080/readyz"
+        status_code: 200
+      register: ready
+      retries: 30
+      delay: 2
+      until: ready.status == 200
+
+    - name: Laisser Apache le remettre en rotation
+      ansible.builtin.pause:
+        seconds: 10

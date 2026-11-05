@@ -1,0 +1,81 @@
+- name: Installer le serveur NFS
+  ansible.builtin.apt:
+    name: nfs-kernel-server
+    state: present
+
+- name: Point de montage du disque partagé
+  ansible.builtin.file:
+    path: "{{ nas_export }}"
+    state: directory
+    mode: "0755"
+
+- name: Formater le disque régional (première fois, sur le NAS actif)
+  when: inventory_hostname == nas_active
+  community.general.filesystem:
+    dev: /dev/disk/by-id/google-tickets
+    fstype: ext4
+    opts: -L tickets
+
+- name: "Déclarer le montage sur les deux NAS (nofail : le passif démarre sans le disque)"
+  ansible.posix.mount:
+    path: "{{ nas_export }}"
+    src: LABEL=tickets
+    fstype: ext4
+    opts: defaults,noatime,nofail,x-systemd.device-timeout=10s
+    state: "{{ 'mounted' if inventory_hostname == nas_active else 'present' }}"
+
+- name: Dossiers de configuration
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: [/etc/systemd/system/nfs-server.service.d, /etc/exports.d]
+
+- name: Le serveur NFS ne démarre que si le disque est monté (le passif reste muet, le health check le voit)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nfs-server.service.d/genarchi.conf
+    mode: "0644"
+    content: |
+      [Unit]
+      ConditionPathIsMountPoint={{ nas_export }}
+      RequiresMountsFor={{ nas_export }}
+  notify: Recharger systemd
+
+- name: NFS v4 seulement
+  community.general.ini_file:
+    path: /etc/nfs.conf
+    section: nfsd
+    option: "{{ item.k }}"
+    value: "{{ item.v }}"
+    mode: "0644"
+  loop:
+    - { k: vers3, v: "n" }
+    - { k: grace-time, v: "30" }
+    - { k: lease-time, v: "30" }
+  notify: Redémarrer NFS
+
+- name: Partager le dossier des QR avec les serveurs d'application
+  ansible.builtin.copy:
+    dest: /etc/exports.d/genarchi.exports
+    mode: "0644"
+    content: |
+      {{ nas_export }} {{ subnets.app }}(rw,sync,no_subtree_check,root_squash)
+  notify: Recharger les exports
+
+- name: Sur le NAS actif
+  when: inventory_hostname == nas_active
+  block:
+    - name: Les fichiers appartiennent au compte de l'app (même uid sur tous les serveurs)
+      ansible.builtin.file:
+        path: "{{ nas_export }}"
+        state: directory
+        owner: "{{ app_uid }}"
+        group: "{{ app_uid }}"
+        mode: "0750"
+
+    - name: Démarrer NFS
+      ansible.builtin.systemd_service:
+        name: nfs-server
+        enabled: true
+        state: started
+        daemon_reload: true

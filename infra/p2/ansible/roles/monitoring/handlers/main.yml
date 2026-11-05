@@ -1,0 +1,14 @@
+- name: Redémarrer le serveur Zabbix
+  ansible.builtin.systemd_service:
+    name: zabbix-server
+    state: restarted
+
+- name: Recharger Apache
+  ansible.builtin.systemd_service:
+    name: apache2
+    state: reloaded
+
+- name: Redémarrer rsyslog
+  ansible.builtin.systemd_service:
+    name: rsyslog
+    state: restarted

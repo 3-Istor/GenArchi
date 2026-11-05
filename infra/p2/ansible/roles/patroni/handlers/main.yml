@@ -1,0 +1,4 @@
+- name: Recharger Patroni
+  ansible.builtin.systemd_service:
+    name: patroni
+    state: reloaded

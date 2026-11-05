@@ -1,0 +1,11 @@
+# Géré par Ansible (rôle zabbix_agent)
+PidFile=/run/zabbix/zabbix_agent2.pid
+LogFile=/var/log/zabbix/zabbix_agent2.log
+LogFileSize=10
+Server={{ monitoring_ip }}
+ServerActive={{ monitoring_ip }}
+Hostname={{ inventory_hostname }}
+HostMetadata=genarchi {{ group_names | join(' ') }} {{ datacenter }}
+ControlSocket=/run/zabbix/agent.sock
+Include=./zabbix_agent2.d/plugins.d/*.conf
+Include=/etc/zabbix/zabbix_agent2.d/*.conf
