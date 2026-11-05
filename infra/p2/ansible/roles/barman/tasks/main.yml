@@ -41,6 +41,7 @@
       last_backup_maximum_age = 2 DAYS
 
 - name: Lancer la réception des WAL (barman cron, déjà planifié chaque minute par le paquet)
+  become: true
   become_user: barman
   ansible.builtin.command: barman cron
   changed_when: false

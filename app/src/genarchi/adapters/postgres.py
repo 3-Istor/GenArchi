@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from importlib import resources
 
 import psycopg
 from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 from .. import domain
 from ..domain import Event, EventStats, Order, Problem, Ticket, TicketStatus
@@ -53,9 +55,17 @@ class PostgresStore:
             max_size=max_size,
             open=True,
             timeout=5,
+            # Après une panne de la base (bascule Patroni, redémarrage), le pool doit toujours finir par se
+            # reconnecter : sans limite de durée (le défaut abandonne au bout de 5 min).
+            reconnect_timeout=float("inf"),
+            # Connexion vérifiée avant d'être prêtée : une connexion vers l'ancien primaire est jetée.
+            check=ConnectionPool.check_connection,
             kwargs={
                 "row_factory": dict_row,
                 "connect_timeout": 2,
+                # Refuse un serveur en lecture seule : pendant une bascule, le LB peut encore envoyer
+                # quelques connexions vers l'ancien primaire ; le pool réessaie jusqu'au nouveau.
+                "target_session_attrs": "read-write",
                 "options": "-c statement_timeout=2000 -c lock_timeout=2000",
             },
         )
@@ -63,13 +73,23 @@ class PostgresStore:
     def close(self) -> None:
         self.pool.close()
 
+    @contextmanager
+    def _conn(self) -> Iterator[psycopg.Connection]:
+        """Connexion du pool ; une indisponibilité passagère de la base devient un 503 (le client réessaie)."""
+        try:
+            with self.pool.connection() as c:
+                yield c
+        except (PoolTimeout, psycopg.OperationalError, psycopg.errors.ReadOnlySqlTransaction) as e:
+            log.warning("database unavailable", extra={"error": type(e).__name__})
+            raise Problem(503, "unavailable", "base de données momentanément indisponible, réessayer") from e
+
     def ping(self) -> None:
         with self.pool.connection(timeout=1) as c:
             c.execute("SELECT 1")
 
     def migrate(self) -> list[str]:
         applied = []
-        with self.pool.connection() as c:
+        with self._conn() as c:
             c.execute("SELECT pg_advisory_lock(%s)", (MIGRATION_LOCK,))
             try:
                 c.execute(
@@ -90,7 +110,7 @@ class PostgresStore:
         return applied
 
     def create_event(self, event: Event) -> Event:
-        with self.pool.connection() as c:
+        with self._conn() as c:
             c.execute(
                 "INSERT INTO events (id, name, venue, starts_at, sales_open_at, capacity, remaining, "
                 "price_cents, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
@@ -109,19 +129,19 @@ class PostgresStore:
         return event
 
     def get_event(self, event_id: str) -> Event | None:
-        with self.pool.connection() as c:
+        with self._conn() as c:
             r = c.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone()
         return _event(r) if r else None
 
     def list_events(self) -> list[Event]:
-        with self.pool.connection() as c:
+        with self._conn() as c:
             rows = c.execute("SELECT * FROM events ORDER BY starts_at, id").fetchall()
         return [_event(r) for r in rows]
 
     def place_order(self, event_id, idempotency_key, buyer_email, quantity, request_hash):
         oid = domain.order_doc_id(event_id, idempotency_key)
         at = domain.now()
-        with self.pool.connection() as c:
+        with self._conn() as c:
             try:
                 with c.transaction():
                     event = c.execute("SELECT * FROM events WHERE id = %s", (event_id,)).fetchone()
@@ -185,7 +205,7 @@ class PostgresStore:
                 return existing, False
 
     def get_order(self, order_id: str) -> Order | None:
-        with self.pool.connection() as c:
+        with self._conn() as c:
             r = c.execute("SELECT * FROM orders WHERE id = %s", (order_id,)).fetchone()
             if r is None:
                 return None
@@ -203,12 +223,12 @@ class PostgresStore:
         )
 
     def get_ticket(self, ticket_id: str) -> Ticket | None:
-        with self.pool.connection() as c:
+        with self._conn() as c:
             r = c.execute("SELECT * FROM tickets WHERE id = %s", (ticket_id,)).fetchone()
         return _ticket(r) if r else None
 
     def list_pending(self, older_than: datetime, limit: int) -> list[Ticket]:
-        with self.pool.connection() as c:
+        with self._conn() as c:
             rows = c.execute(
                 "SELECT * FROM tickets WHERE status = 'pending' AND created_at <= %s ORDER BY created_at LIMIT %s",
                 (older_than, limit),
@@ -216,7 +236,7 @@ class PostgresStore:
         return [_ticket(r) for r in rows]
 
     def mark_issued(self, ticket_id: str, qr_object: str, at: datetime) -> tuple[Ticket, bool]:
-        with self.pool.connection() as c:
+        with self._conn() as c:
             r = c.execute(
                 "UPDATE tickets SET status = 'issued', qr_object = %s, issued_at = %s "
                 "WHERE id = %s AND status = 'pending' RETURNING *",
@@ -230,7 +250,7 @@ class PostgresStore:
         return _ticket(r), False
 
     def mark_scanned(self, ticket_id: str, at: datetime) -> tuple[Ticket, bool]:
-        with self.pool.connection() as c:
+        with self._conn() as c:
             r = c.execute(
                 "UPDATE tickets SET status = 'scanned', scanned_at = %s "
                 "WHERE id = %s AND status = 'issued' RETURNING *",
@@ -250,7 +270,7 @@ class PostgresStore:
         e = self.get_event(event_id)
         if e is None:
             return None
-        with self.pool.connection() as c:
+        with self._conn() as c:
             rows = c.execute(
                 "SELECT status, count(*) AS n FROM tickets WHERE event_id = %s GROUP BY status", (event_id,)
             ).fetchall()

@@ -64,6 +64,10 @@ services:
     <<: *app
     environment: { <<: *p2-env, INSTANCE_NAME: api-p2-local }
     ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+      interval: 2s
+      retries: 30
     volumes: ["tickets-p2:/data/tickets"]
     depends_on:
       migrate-p2: { condition: service_completed_successfully }
@@ -93,6 +97,10 @@ services:
       EVENTS_BACKEND: none
       INSTANCE_NAME: api-p3-local
     ports: ["8090:8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+      interval: 2s
+      retries: 30
     volumes: ["tickets-p3:/data/tickets"]
     depends_on: [firestore]
     profiles: ["p3"]

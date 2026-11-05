@@ -25,9 +25,9 @@ git checkout <tag>
 make p3-canary
 ```
 
-Pour chaque région, l'une après l'autre : nouvelle révision sans trafic → 10 % du trafic pendant 5 min → si plus de 1 % de 5xx, **retour automatique** à la révision stable et arrêt ; sinon 100 %. Puis OpenTofu enregistre l'image (le worker et les jobs passent aussi à la nouvelle version).
+Pour chaque région, l'une après l'autre : nouvelle révision sans trafic → 10 % du trafic pendant 5 min → si plus de 2 % de 5xx (contrat P3), **retour automatique** à la révision stable et arrêt ; sinon 100 %. Puis OpenTofu enregistre l'image (le worker et les jobs passent aussi à la nouvelle version).
 
-Réglages : `WATCH_SECONDS=600 MAX_ERROR_RATIO=0.005 make p3-canary`.
+Réglages : `WATCH_SECONDS=600 MAX_ERROR_RATIO=0.01 make p3-canary`.
 
 ## Retour arrière manuel
 

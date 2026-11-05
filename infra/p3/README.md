@@ -1,9 +1,31 @@
-# Infrastructure Platform 3
+# Infrastructure Platform 3 — born to be cloud
 
-Emplacement réservé au futur livrable Terraform P3. Aucun fichier Terraform ni environnement déployable n’est présent.
+Aucun serveur : services Cloud Run sans état dans deux régions, données multi-région, événements émis par la base, mises en production progressives et test de panne permanent. Spec : [`docs/architecture/platform3.md`](../../docs/architecture/platform3.md).
 
-Piste du [kickoff, diapositive 5](../../docs/references/originaux/kickoff.pptx) : instances remplaçables, données externalisées, contrôles de santé et reprise automatisée. Fournisseur, conteneurs et mécanismes de réparation restent à choisir ; aucun orchestrateur n’est imposé.
+```text
+Internet ─TLS─▶ LB HTTP(S) global + Cloud Armor (WAF OWASP, 600 req/min/IP)
+                 ├─ /  ─▶ bucket du front (Cloud CDN)
+                 └─ API ─▶ Cloud Run p3-api  europe-west1 │ europe-west4   (min 1 instance, readiness /readyz)
+Firestore (eur3, PITR, sauvegarde quotidienne) ── billet créé ─▶ Eventarc ─▶ Cloud Run p3-worker (2 régions)
+p3-worker ─▶ QR dans GCS dual-région (turbo) ; ─▶ Pub/Sub ticket-issued ─▶ BigQuery
+Cloud Scheduler : p3-issue-pending (5 min, 2 régions) ; p3-chaos-region (nuit, 10 min de région « non prête »)
+Monitoring : sonde externe, SLO 99,9 %, alerte burn rate
+```
 
-Avant implémentation, confirmer l’environnement, les services autorisés, les accès et coûts, le périmètre Terraform et les critères d’auto-reprise : [Q-001 à Q-004 et Q-009](../../docs/cadrage.md). Formaliser les choix dans les [ADR](../../docs/adr/README.md).
+| Fichier | Contenu |
+|---|---|
+| `main.tf` | Providers, API, Artifact Registry |
+| `iam.tf` | Un compte de service par composant, droits minimaux |
+| `data.tf` | Firestore + index + sauvegardes, buckets, Pub/Sub → BigQuery, secrets |
+| `run.tf` | Services API et worker, triggers Eventarc, jobs planifiés (rattrapage, chaos) |
+| `edge.tf` | LB global, NEG serverless, Cloud Armor, CDN, certificat géré, redirection HTTP, DNS Cloudflare |
+| `monitoring.tf` | Sonde, SLO, alertes |
+| `scripts/` | Build de l'image (Cloud Build), smoke, canary avec retour arrière automatique |
 
-Documenter ensuite prérequis, paramètres, gestion sécurisée de l’état Terraform, déploiement, vérifications et remise en état/destruction. Garder les secrets et états hors Git ; versionner le futur fichier de verrouillage des providers. Les [tests de résilience](../../tests/resilience/README.md) devront observer le comportement effectif et la réparation.
+Cibles : `make p3-plan`, `p3-deploy`, `p3-canary`, `p3-smoke`, `p3-chaos-region`, `p3-destroy`. Variables : [`env.mk.example`](env.mk.example), [`variables.tf`](variables.tf).
+
+## Ce qui a été vérifié
+
+- `tofu validate` (providers google 8.x, cloudflare 5.x) ; attributs contrôlés contre le schéma des providers ; frontière P2/P3 respectée.
+- L'app tourne en local « comme en P3 » (émulateurs Firestore et Pub/Sub, `make up-p3 smoke-local`) et passe les tests de contrat sur Firestore, dont 200 achats concurrents sur 100 places.
+- **Pas encore exécuté sur GCP** : `tofu apply`, Eventarc Firestore, bascule *service health*, canary, chaos nocturne.

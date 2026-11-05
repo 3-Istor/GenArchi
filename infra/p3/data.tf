@@ -44,7 +44,7 @@ resource "google_firestore_index" "by_event_status" {
 
 # --- Cloud Storage : QR codes (dual-région, réplication turbo) et front statique ------------------------
 resource "google_storage_bucket" "tickets" {
-  name                        = "${var.project_id}-${var.name_prefix}-tickets"
+  name                        = "${var.project_id}-tickets"
   location                    = "EU"
   rpo                         = "ASYNC_TURBO"
   uniform_bucket_level_access = true
@@ -72,7 +72,7 @@ resource "google_storage_bucket" "tickets" {
 }
 
 resource "google_storage_bucket" "front" {
-  name                        = "${var.project_id}-${var.name_prefix}-front"
+  name                        = "${var.project_id}-front"
   location                    = "EU"
   uniform_bucket_level_access = true
   force_destroy               = true

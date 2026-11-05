@@ -20,7 +20,7 @@
     dest: "{{ app_root }}/releases/"
     mode: "0644"
   loop: ["{{ app_wheel }}", "{{ app_dist }}/requirements.txt"]
-  register: release_files
+  register: app_release_files
 
 - name: Virtualenv de cette version
   ansible.builtin.command: python3 -m venv {{ app_root }}/venv-{{ app_version }}
@@ -30,10 +30,10 @@
 - name: Cette version est-elle déjà installée ?
   ansible.builtin.stat:
     path: "{{ app_root }}/venv-{{ app_version }}/.genarchi-installed"
-  register: venv_marker
+  register: app_venv_marker
 
 - name: Installer les dépendances (empreintes vérifiées) puis l'app
-  when: release_files.changed or not (venv_marker.stat.exists)
+  when: app_release_files.changed or not (app_venv_marker.stat.exists)
   ansible.builtin.shell: |
     set -euo pipefail
     v={{ app_root }}/venv-{{ app_version }}

@@ -38,8 +38,8 @@ done
 [[ $st == issued ]] && ok "QR émis en $(( $(date +%s) - t0 )) s" || ko "billet toujours $st"
 [[ $("${C[@]}" -L "$BASE/tickets/$tid/qr" | head -c 4 | od -An -c | tr -d ' ') == *PNG* ]] && ok "QR téléchargé (PNG)" || ko "QR"
 
-[[ $("${C[@]}" -o /dev/null -w '%{http_code}' -X POST "$BASE/tickets/$tid/scan" -H "Authorization: Bearer $STAFF") == 200 ]] \
+[[ $("${C[@]}" -o /dev/null -w '%{http_code}' -X POST "$BASE/tickets/$tid/scan" -H "Authorization: Bearer $STAFF" --data "") == 200 ]] \
   && ok "premier scan accepté" || ko "scan"
-[[ $("${C[@]}" -X POST "$BASE/tickets/$tid/scan" -H "Authorization: Bearer $STAFF" | jq -r .code) == already_scanned ]] \
+[[ $("${C[@]}" -X POST "$BASE/tickets/$tid/scan" -H "Authorization: Bearer $STAFF" --data "" | jq -r .code) == already_scanned ]] \
   && ok "second scan refusé (already_scanned)" || ko "second scan"
 echo "Tout est vert."

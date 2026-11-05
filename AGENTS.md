@@ -2,7 +2,7 @@
 
 ## Contexte et lecture
 
-Ce dépôt prépare un projet pédagogique d’application web résiliente sur P2 et P3 avec deux livrables Terraform. Il ne contient actuellement aucun code exécutable.
+Ce dépôt porte un projet pédagogique d’application web résiliente sur P2 et P3 avec deux livrables Terraform (écrits pour OpenTofu, [ADR 0014](docs/adr/0014-outillage-opentofu-nix-mise.md)). Il contient l’application (`app/`), les deux infrastructures (`infra/`) et leurs runbooks (`docs/runbooks/`) ; les commandes vérifiées sont dans le [README](README.md).
 
 Avant de contribuer, lire dans cet ordre :
 
@@ -23,11 +23,11 @@ Avant de contribuer, lire dans cet ordre :
 
 ## Contributions
 
-- Respecter le périmètre demandé. La préparation initiale est documentaire, sans implémentation de l’application ou de Terraform.
+- Respecter le périmètre demandé.
 - Rédiger en français, avec des noms de fichiers simples et des liens relatifs. Utiliser `AAAA-MM-JJ-sujet.md` pour les réunions et `NNNN-sujet.md` pour les ADR.
 - Tenir le cadrage, les index et les README concernés à jour lors d’un changement. Relier les décisions aux CR ou restitutions qui attestent leur validation.
 - Conserver les originaux PowerPoint sans modification. Documenter un remplacement de source et actualiser la synthèse et les références associées.
-- Ne pas ajouter de commandes de build ou de test tant qu’elles ne correspondent pas à des outils réellement présents. Quand ils seront introduits, documenter les prérequis et commandes vérifiées dans le README concerné.
+- Toute commande passe par le `Makefile` ; documenter les prérequis et commandes vérifiées dans le README concerné. Avant de rendre la main : `make lint test validate` (et `make test-integration` si l’app change, `make p2-lab` si les rôles Ansible changent).
 - Ne pas versionner de secrets, identifiants d’accès, états Terraform, configurations locales ou données sensibles dans les preuves. Les futurs fichiers `.terraform.lock.hcl` doivent pouvoir être versionnés.
 - Ne pas exécuter de déploiement, destruction d’infrastructure ou injection de panne sur un environnement sans autorisation couvrant cette action et sa cible.
 
@@ -39,4 +39,4 @@ Avant de contribuer, lire dans cet ordre :
 - Distinguer inspection, contrôles statiques, tests locaux, déploiement et test réel de résilience. Ne revendiquer que les opérations effectivement réalisées et préciser celles qui restent non exécutées.
 - Pour une preuve de résilience, suivre les [modèles](tests/resilience/README.md) et conserver la version testée, la cible et les observations. Un scénario rédigé n’est pas un test réussi.
 
-Cette livraison initiale reste locale, sans commit, push ni CI ajoutée.
+Commits et push sur des branches de travail uniquement, jamais directement sur `main`.

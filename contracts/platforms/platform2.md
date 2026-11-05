@@ -1,75 +1,41 @@
 # Contrat Platform 2 — « Datacenter virtuel »
 
-Contrat `0.1.0`, **proposition non validée** (fournisseur : [ADR 0001](../../docs/adr/0001-fournisseur-gcp.md), proposé). Les seuils sont des cibles proposées, à confirmer avec Q-001. Ce que la Platform 2 promet à l'app, aux tests et au jury. Le *comment* est dans [`docs/architecture/platform2.md`](../../docs/architecture/platform2.md).
+Contrat `0.2.0`, **proposition non validée** ([ADR 0015](../../docs/adr/0015-p2-clusters-etat-de-l-art.md)). Fournisseur : GCP ([ADR 0001](../../docs/adr/0001-fournisseur-gcp.md), accepté). Ce que la P2 promet à l'app, aux tests et au jury. Le *comment* : [`docs/architecture/platform2.md`](../../docs/architecture/platform2.md) et [`infra/p2/`](../../infra/p2/README.md).
 
 ## 1. Positionnement
 
-Colonne **« Virtual 2 Virtual / DC as a Service »** du cours (Cours 1, slide 10) : GCP est utilisé comme un datacenter d'entreprise virtualisé, **sans transformation applicative**. Haute disponibilité par **redondance de l'infrastructure**, exploitation **ITIL** (procédures humaines).
+Colonne « Virtual 2 Virtual / DC as a Service » (cours 1, diapositive 10) : GCP est utilisé comme un datacenter d'entreprise, **sans transformation de l'application**. Haute disponibilité par **redondance de l'infrastructure** (clusters installés dans des VM), exploitation par **procédures humaines** ([runbooks](../../docs/runbooks/README.md)).
 
-## 2. Engagements de service (cibles, vérifiées par `contracts/tests/acceptance.md`)
+## 2. Engagements de service (cibles)
 
-| Indicateur | Cible P2 | Remarque |
+| Indicateur | Cible P2 | Mécanisme |
 |---|---|---|
-| Modèle SLA | *Designed for failover* | Cours 1, slide 9 |
-| Disponibilité | 99,9 % (cible de conception, non mesurable sur un mois de TD) | Mesurée pendant les campagnes T1–T5 |
-| Latence `GET /events` | p95 < 300 ms à 50 req/s | Au-delà, saturation attendue (scalabilité verticale) |
-| Capacité d'achat | ≥ 50 commandes/s soutenues | Limite assumée, à mesurer en T1 |
-| Délai d'émission des billets (I4) | ≤ 15 min (batch) + durée du batch | Billet `pending` visible tout de suite |
-| Perte d'une VM web ou app | Aucune requête perdue au-delà de ~10 s (retrait par health check) | Remise en service **manuelle** |
-| Perte de la base primaire | **RTO ≤ 30 min**, **RPO ≤ 5 min** | Bascule manuelle par runbook `ops/runbooks/p2-db-failover.md` |
-| Perte d'une zone | RTO ≤ 30 min (zone b survit si la base y est promue), RPO ≤ 5 min | Le partage NFS (zone a) est un SPOF assumé : les QR sont régénérables |
-| Sauvegarde | `pg_dump` quotidien 02:00 (rétention 7 j) + snapshots de disques quotidiens (rétention 7 j) | Restauration = runbook |
-| Mise en production | Fenêtre de maintenance, déploiement VM par VM, après RFC approuvée | Pas de rollback automatique |
-| Patching | Mensuel, en place (`apt upgrade`), VM par VM | Dérive de configuration possible et assumée |
+| Modèle SLA | *Designed for failover* | Cours 1, diapositive 9 |
+| Délai d'émission des billets (I4) | quelques secondes ; ≤ 5 min en dégradé | File RabbitMQ ; rattrapage toutes les 5 min |
+| Perte d'un serveur web ou d'app | ≤ 10 s de rotation, remise en service manuelle | Health checks du LB et d'Apache |
+| Perte du primaire PostgreSQL | RTO < 1 min (automatique), **RPO = 0** | Patroni, réplication synchrone, quorum etcd |
+| Perte d'un nœud RabbitMQ | aucune interruption | Files quorum, 3 nœuds |
+| Perte du NAS actif | RTO ≤ 15 min (runbook), **RPO = 0** | Disque régional, bascule manuelle |
+| Perte d'une zone (DC) | Service maintenu ; NAS à basculer à la main | Tout est doublé en DC1 / DC2, témoins en zone c |
+| Perte de la région | Hors engagement : PRA manuel | Instantanés copiés dans l'UE, sauvegardes Barman |
+| Sauvegarde | WAL en continu + complète nocturne (7 j), instantanés horaires du NAS et nocturnes des disques (7 j) | Barman, politiques d'instantanés |
+| Mise en production | RFC, déploiement serveur par serveur, retour arrière = version précédente | `make p2-release` |
+| Patching | Mensuel, serveur par serveur | [`p2-deploy.md`](../../docs/runbooks/p2-deploy.md) |
 
 ## 3. Ce que la plateforme fournit à l'app
 
-Voir la colonne P2 de [`runtime/app-runtime.md` § B](../runtime/app-runtime.md#b-ce-que-chaque-plateforme-doit-fournir). En résumé : VM Debian 12, Python 3.11, virtualenv + systemd, PostgreSQL 15, partage NFS sur `/mnt/tickets`, fichier d'environnement `/etc/genarchi/genarchi.env`, timer d'émission toutes les 15 min.
+Colonne P2 de [`runtime/app-runtime.md` § B](../runtime/app-runtime.md#b-ce-que-chaque-plateforme-doit-fournir) : VM Debian 13, Python 3.13, virtualenv + systemd, PostgreSQL 17 via `db.p2.genarchi.internal`, NFS sur `/mnt/tickets`, RabbitMQ (`AMQP_URLS`), `/etc/genarchi/genarchi.env` (0600).
 
-## 4. Contraintes de génération (non négociables)
+## 4. Contraintes de génération
 
-La P2 **ne doit pas** utiliser :
+La P2 **ne doit pas** utiliser : container, service de données managé, autoscaling ou autohealing, stockage objet pour les données de l'app, bus d'événements managé, load balancer global. Vérifié par [`boundary.toml`](boundary.toml) (`scripts/check_boundary.py`). Exception : le bucket d'état OpenTofu (`infra/bootstrap/`), hors plateforme.
 
-- de container (ni Docker sur VM, ni Cloud Run, ni GKE) ;
-- de service de données managé (Cloud SQL, AlloyDB, Firestore, Memorystore…) ;
-- d'autoscaling ni d'autohealing (pas de Managed Instance Group) ;
-- de stockage objet pour les données de l'app (pas de bucket Cloud Storage) ;
-- de bus d'événements (Pub/Sub, Eventarc) ;
-- de load balancer global (anycast multi-région).
+Autorisé : VM nommées, disques (zonaux et régionaux), VPC à sous-réseaux par tier, pare-feu par plage, DNS privé, LB **régionaux** (externe et internes), Certificate Manager, Cloud NAT, IAP pour le bastion.
 
-Ces interdits sont vérifiés en CI à partir de [`boundary.toml`](boundary.toml). Exception : le bucket de state Terraform, créé par `infra/bootstrap/`, hors périmètre plateforme.
+## 5. Interface OpenTofu (`infra/p2/`)
 
-Autorisé et attendu : VM nommées, disques persistants, VPC custom avec sous-réseaux /24 par tier, règles firewall par plage, DNS privé (Cloud DNS) pour le nom `db-primary`, load balancer **régional**, Cloud NAT pour les mises à jour, bastion.
+Entrées principales : `project_id`, `region` (`europe-west9`), `domain`, `cloudflare_zone_id`, `network_cidr` (`10.20.0.0/16`), `nas_active` (`nas-1` | `nas-2`), `machine_types`, `image` (`debian-cloud/debian-13`), `labels`. Détail : [`variables.tf`](../../infra/p2/variables.tf).
 
-## 5. Interface Terraform (`infra/p2/`)
+Sorties : `url`, `lb_ip`, `bastion`, `network_prefix`, `nas_active`, `ansible_inventory` (sensible : contient les secrets, écrit par `make p2-inventory`).
 
-### Entrées
-
-| Variable | Type | Défaut | Rôle |
-|---|---|---|---|
-| `project_id` | string | — | Projet GCP dédié P2 |
-| `region` | string | `europe-west9` | Région unique |
-| `zones` | list(string) | `["europe-west9-a", "europe-west9-b"]` | Les deux « DC » |
-| `name_prefix` | string | `p2` | Préfixe des ressources |
-| `vpc_cidr_plan` | object | voir archi | Plages des sous-réseaux front, app, data, admin, proxy-only |
-| `machine_types` | map(string) | `web=e2-small, app=e2-small, db=e2-medium, nfs=e2-small, batch=e2-small, mon=e2-medium, bastion=e2-micro` | Dimensionnement **vertical** |
-| `os_image` | string | `debian-cloud/debian-12` | Image de base |
-| `db_disk_size_gb` | number | `20` | Disque de données PostgreSQL |
-| `admin_members` | list(string) | — | Comptes autorisés en SSH via IAP sur le bastion |
-| `alert_email` | string | — | Destinataire des alertes Zabbix |
-| `labels` | map(string) | `{ platform = "p2", project = "genarchi" }` | Appliqués partout |
-
-### Sorties
-
-| Sortie | Contenu |
-|---|---|
-| `base_url` | URL publique (LB régional) |
-| `lb_ip` | IP du load balancer |
-| `instances` | map nom → `{ zone, internal_ip, role }` |
-| `ansible_inventory` | Inventaire INI généré, consommé par `infra/p2/ansible/` |
-| `db_primary_fqdn` | `db-primary.p2.genarchi.internal` |
-| `bastion_name` | Nom du bastion (pour `gcloud compute ssh --tunnel-through-iap`) |
-
-### Cycle de vie
-
-`terraform apply` construit le « datacenter » (réseau, VM, LB, DNS, snapshots planifiés). **Ensuite** Ansible installe et configure (nginx, app, PostgreSQL + réplication, NFS, Zabbix, timers). Le temps total jusqu'au premier billet vendu est mesuré en T8.
+Cycle de vie : `make p2-apply` construit le datacenter, `make p2-configure` (Ansible) installe et configure tout, `make p2-release` met une version en production.

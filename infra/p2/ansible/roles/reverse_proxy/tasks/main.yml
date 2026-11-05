@@ -18,8 +18,8 @@
     else mv /etc/modsecurity/modsecurity.conf.new /etc/modsecurity/modsecurity.conf; fi
   args:
     executable: /bin/bash
-  register: modsec
-  changed_when: modsec.stdout != 'same'
+  register: reverse_proxy_modsec
+  changed_when: reverse_proxy_modsec.stdout != 'same'
   notify: Redémarrer Apache
 
 - name: Durcissement (pas de version affichée, pas de TRACE)
@@ -64,8 +64,8 @@
     echo "$out"
   args:
     executable: /bin/bash
-  register: sites
-  changed_when: sites.stdout == 'changed'
+  register: reverse_proxy_sites
+  changed_when: reverse_proxy_sites.stdout == 'changed'
   notify: Redémarrer Apache
 
 - name: Vérifier la configuration avant redémarrage

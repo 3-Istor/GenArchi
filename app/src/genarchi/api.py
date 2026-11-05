@@ -170,7 +170,7 @@ def create_app(c: Container) -> FastAPI:
 
     @app.exception_handler(Problem)
     async def _problem(_req: Request, exc: Problem):
-        headers = {"Retry-After": "2"} if exc.code == "ticket_not_issued" else None
+        headers = {"Retry-After": "2"} if exc.code in ("ticket_not_issued", "unavailable") else None
         return problem_response(exc.status, exc.code, exc.detail, headers, **exc.extra)
 
     @app.exception_handler(RequestValidationError)

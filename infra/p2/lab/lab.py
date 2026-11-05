@@ -52,6 +52,10 @@ SHARED_TICKETS = {"app-1a", "app-1b", "scheduler"}
 def run_container(name, ip):
     args = ["docker", "run", "-d", "--name", f"p2lab-{name}", "--hostname", name, "--network", NET, "--ip", ip,
             "--privileged", "--tmpfs", "/run", "--tmpfs", "/run/lock", "-e", "container=docker"]
+    # Docker réécrit /etc/hosts à chaque démarrage : on lui donne les mêmes entrées que le rôle common.
+    for n, (h_ip, _, _) in HOSTS.items():
+        args += ["--add-host", f"{n}.p2.genarchi.internal:{h_ip}", "--add-host", f"{n}:{h_ip}"]
+    args += ["--add-host", f"db.p2.genarchi.internal:{VIP[1]}"]
     if name in SHARED_TICKETS:
         args += ["-v", "p2lab-tickets:/mnt/tickets"]
     if cgroup_v2():

@@ -1,6 +1,6 @@
 # Architecture
 
-> Propositions des tech leads, **non validées** (ADR au statut proposé). Instantané du cadrage du 1er novembre : [`2026-11-01-dossier-cadrage.html`](2026-11-01-dossier-cadrage.html) (certains points y sont dépassés : le chaos et le rollback automatique y figurent en bonus, ils sont proposés obligatoires en P3 dans [`challenge.md`](challenge.md)).
+> Propositions des tech leads, **non validées** (ADR au statut proposé), implémentées dans `infra/` (version 0.2 « état de l'art », 2026-11-04). Instantané du cadrage du 1er novembre : [`2026-11-01-dossier-cadrage.html`](2026-11-01-dossier-cadrage.html) (certains points y sont dépassés : le chaos et le rollback automatique y figurent en bonus, ils sont proposés obligatoires en P3 dans [`challenge.md`](challenge.md)).
 
 Ordre de travail proposé :
 
@@ -22,9 +22,9 @@ Ordre de travail proposé :
 | Qui survit à la panne ? | L'infrastructure (redondance) | L'application (résilience) |
 | Qui agit quand ça casse ? | Un humain, avec un runbook | Le système, tout seul |
 | Unité | Le serveur nommé (« pet ») | Le service, instances anonymes (« cattle ») |
-| Données | PostgreSQL dans une VM | Firestore multi-région |
-| Fichiers | Bloc + NFS | Objet |
-| Traitement asynchrone | Batch toutes les 15 min | Événements Pub/Sub |
+| Données | PostgreSQL + Patroni dans des VM | Firestore multi-région |
+| Fichiers | NAS (NFS sur disque régional) | Objet dual-région |
+| Traitement asynchrone | File RabbitMQ dans des VM | Événement émis par Firestore (Eventarc) |
 | Mise en prod | RFC + runbook | Merge → canary → rollback auto |
 
 ## Conventions pour Noodle

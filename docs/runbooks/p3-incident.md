@@ -4,7 +4,7 @@ La P3 se répare seule ; l'humain observe, explique et corrige la cause.
 
 ## Alerte « SLO burn rate »
 
-Le budget d'erreur (0,5 % de requêtes en 5xx sur 28 jours) est consommé 10 fois trop vite.
+Le budget d’erreur (0,1 % de requêtes en 5xx sur 28 jours) est consommé 10 fois trop vite.
 
 1. Monitoring → Services → *GenArchi P3 API* : quelle région, depuis quand.
 2. Logs : `resource.type="cloud_run_revision" severity>=ERROR`, filtrer par `trace` pour suivre une requête de bout en bout.

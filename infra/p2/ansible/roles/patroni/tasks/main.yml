@@ -42,19 +42,20 @@
   ansible.builtin.uri:
     url: "http://{{ p2_hosts[inventory_hostname] }}:8008/cluster"
     return_content: true
-  register: cluster
+  register: patroni_cluster
   retries: 30
   delay: 5
-  until: cluster.status == 200 and (cluster.json.members | selectattr('role', 'equalto', 'leader') | list | length) == 1
+  until: patroni_cluster.status == 200 and (patroni_cluster.json.members | selectattr('role', 'equalto', 'leader') | list | length) == 1
 
 - name: Ce serveur est-il le primaire ?
   ansible.builtin.uri:
     url: "http://127.0.0.1:8008/primary"
     status_code: [200, 503]
-  register: primary
+  register: patroni_primary
 
 - name: Comptes et base de l'application (sur le primaire seulement)
-  when: primary.status == 200
+  when: patroni_primary.status == 200
+  become: true
   become_user: postgres
   block:
     - name: Rôles

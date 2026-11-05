@@ -23,18 +23,19 @@ setup: ## Installe les dépendances Python de l'app et les collections Ansible
 
 ## --- Qualité -------------------------------------------------------------------------------------
 lint: ## Lint app + OpenTofu + scripts + frontière P2/P3
-	cd $(APP) && uv run ruff check . && uv run ruff format --check .
+	cd $(APP) && uv run --all-extras ruff check . && uv run --all-extras ruff format --check .
 	$(TOFU) fmt -check -recursive infra
 	shellcheck scripts/*.sh infra/p2/scripts/*.sh infra/p3/scripts/*.sh
 	python3 scripts/check_boundary.py
+	cd infra/p2/ansible && ANSIBLE_CONFIG=ansible.cfg uvx --quiet ansible-lint --offline site.yml app.yml ../lab/lab.yml
 
 test: ## Tests unitaires et de contrat (backend mémoire)
-	cd $(APP) && uv run pytest -q
+	cd $(APP) && uv run --all-extras pytest -q
 
 test-integration: services ## Tests sur PostgreSQL, Firestore (émulateur) et RabbitMQ
 	cd $(APP) && TEST_DATABASE_URL=postgresql://genarchi:genarchi@localhost:55432/genarchi \
 	  FIRESTORE_EMULATOR_HOST=localhost:8681 TEST_AMQP_URL=amqp://genarchi:genarchi@localhost:55672/ \
-	  uv run pytest -q
+	  uv run --all-extras pytest -q
 
 validate: ## `tofu validate` des deux plateformes (sans compte GCP)
 	for d in infra/bootstrap infra/p2 infra/p3; do $(TOFU) -chdir=$$d init -backend=false -input=false >/dev/null && $(TOFU) -chdir=$$d validate; done

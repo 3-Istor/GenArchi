@@ -8,7 +8,7 @@ image="${1:?usage: canary.sh <image@digest>}"
 svc="$(tofu -chdir="$P3_DIR" output -raw api_service)"
 mapfile -t regions < <(tofu -chdir="$P3_DIR" output -json regions | jq -r '.[]')
 WATCH_SECONDS="${WATCH_SECONDS:-300}"
-MAX_ERROR_RATIO="${MAX_ERROR_RATIO:-0.01}"
+MAX_ERROR_RATIO="${MAX_ERROR_RATIO:-0.02}"  # contrat P3 : rollback au-delà de 2 % de 5xx
 run() { gcloud run "$@" --project "$P3_PROJECT" --quiet; }
 
 count() { # count <revision> <filtre supplémentaire>

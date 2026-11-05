@@ -78,10 +78,19 @@
       $("order").hidden = false;
       $("order-status").textContent = "Achat en cours…";
       $("tickets").innerHTML = "";
-      const r = await api(`/events/${eventId}/orders`, {
-        method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({ buyer_email: email, quantity }),
-      });
+      // Même clé d'idempotence à chaque essai : rejouer pendant une bascule (503) ne peut pas acheter deux fois.
+      const key = crypto.randomUUID();
+      let r;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        r = await api(`/events/${eventId}/orders`, {
+          method: "POST", headers: { "Idempotency-Key": key },
+          body: JSON.stringify({ buyer_email: email, quantity }),
+        }).catch(() => null);
+        if (r && r.status !== 503 && r.status !== 502) break;
+        $("order-status").textContent = "Service momentanément indisponible, nouvel essai…";
+        await new Promise((res) => setTimeout(res, 2000));
+      }
+      if (!r) { $("order-status").innerHTML = '<span class="err">API injoignable</span>'; return; }
       const body = await r.json();
       if (!r.ok) { $("order-status").innerHTML = `<span class="err">${body.detail || body.code}</span>`; return; }
       $("order-status").innerHTML = `Commande <code>${body.id}</code> confirmée. Émission des QR…`;

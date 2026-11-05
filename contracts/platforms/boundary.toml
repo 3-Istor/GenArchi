@@ -3,7 +3,7 @@
 # Motifs fnmatch sur le type de ressource ou de data source (ex. "google_sql_*").
 # Toute exception doit être justifiée dans une ADR et ajoutée à `allow` avec un commentaire.
 
-contract_version = "0.1.0"
+contract_version = "0.2.0"
 
 [platform2]
 path = "infra/p2"

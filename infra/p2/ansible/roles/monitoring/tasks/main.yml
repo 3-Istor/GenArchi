@@ -10,12 +10,14 @@
     state: started
 
 - name: Rôle PostgreSQL de Zabbix
+  become: true
   become_user: postgres
   community.postgresql.postgresql_user:
     name: zabbix
     password: "{{ secrets.zabbix_db }}"
 
 - name: Base de Zabbix
+  become: true
   become_user: postgres
   community.postgresql.postgresql_db:
     name: zabbix
@@ -24,13 +26,15 @@
     template: template0
 
 - name: Le schéma Zabbix est-il déjà chargé ?
+  become: true
   become_user: postgres
   ansible.builtin.command: psql -d zabbix -tAc "SELECT to_regclass('public.users') IS NOT NULL"
-  register: zabbix_schema
+  register: monitoring_zabbix_schema
   changed_when: false
 
 - name: Charger le schéma, les images et les données initiales
-  when: zabbix_schema.stdout != 't'
+  when: monitoring_zabbix_schema.stdout != 't'
+  become: true
   become_user: zabbix
   ansible.builtin.shell: |
     set -euo pipefail
@@ -119,10 +123,10 @@
     method: POST
     body_format: json
     body: { jsonrpc: "2.0", method: apiinfo.version, params: {}, id: 1 }
-  register: zbx_api
+  register: monitoring_zbx_api
   retries: 30
   delay: 5
-  until: zbx_api.status == 200
+  until: monitoring_zbx_api.status == 200
 
 - name: Configurer Zabbix par API (mot de passe, auto-enregistrement, alertes Discord)
   ansible.builtin.script:
@@ -132,5 +136,5 @@
     executable: /usr/bin/python3
   environment:
     ZABBIX_ADMIN_PASSWORD: "{{ secrets.zabbix_admin }}"
-  register: zbx_setup
-  changed_when: "'changed' in zbx_setup.stdout"
+  register: monitoring_zbx_setup
+  changed_when: "'changed' in monitoring_zbx_setup.stdout"

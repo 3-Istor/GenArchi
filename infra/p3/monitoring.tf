@@ -27,12 +27,12 @@ resource "google_monitoring_custom_service" "api" {
   display_name = "GenArchi P3 API"
 }
 
-# 99,5 % des requêtes du LB sans 5xx sur 28 jours glissants.
+# 99,9 % des requêtes du LB sans 5xx sur 28 jours glissants (contrat P3, § 2).
 resource "google_monitoring_slo" "availability" {
   service             = google_monitoring_custom_service.api.service_id
   slo_id              = "availability"
-  display_name        = "99,5 % des requêtes sans erreur 5xx"
-  goal                = 0.995
+  display_name        = "99,9 % des requêtes sans erreur 5xx"
+  goal                = 0.999
   rolling_period_days = 28
   request_based_sli {
     good_total_ratio {

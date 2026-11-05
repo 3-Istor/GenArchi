@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from genarchi.adapters.memory import MemoryBlob, MemoryStore, NullPublisher
@@ -63,3 +64,19 @@ def test_settings_refuse_missing_backend_config():
 
     with pytest.raises(ValueError, match="DATABASE_URL"):
         _settings(data_backend="postgres")
+
+
+def test_postgres_unreachable_is_503_not_500():
+    """Pendant une bascule de base, le client reçoit 503 + Retry-After (il réessaie), jamais 500."""
+    pytest.importorskip("psycopg_pool")
+    from genarchi.adapters.postgres import PostgresStore
+    from genarchi.domain import Problem
+
+    store = PostgresStore("postgresql://nobody:x@127.0.0.1:1/none", min_size=0, max_size=1)
+    store.pool.timeout = 0.5
+    try:
+        with pytest.raises(Problem) as e:
+            store.get_event("evt_x")
+        assert (e.value.status, e.value.code) == (503, "unavailable")
+    finally:
+        store.close()

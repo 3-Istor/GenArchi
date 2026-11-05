@@ -1,44 +1,77 @@
 # GenArchi — Génération Architecture
 
-Projet pédagogique : concevoir une application web résiliente, la déployer en Platform 2 (P2) et Platform 3 (P3), puis expliquer les différences à partir de preuves observées.
+Projet pédagogique (EPITA, S9 SOAR) : **une même application web résiliente**, une billetterie, déployée sur deux générations de plateforme, puis comparée à partir de preuves observées.
 
-## État au 2 novembre 2026
+| | Platform 2 « datacenter virtuel » | Platform 3 « born to be cloud » |
+|---|---|---|
+| Où | GCP `europe-west9`, zones a / b = DC1 / DC2, zone c = site témoin | GCP, Cloud Run dans `europe-west1` et `europe-west4` |
+| Qui survit à la panne | L'infrastructure : clusters redondés (Patroni, RabbitMQ, NAS sur disque répliqué) | L'application : instances jetables, données multi-région |
+| Qui agit | Un humain, avec un runbook | Le système (bascule de région, canary, rollback) |
+| Livrable | [`infra/p2/`](infra/p2/) : OpenTofu + Ansible | [`infra/p3/`](infra/p3/) : OpenTofu |
+| URL | `https://p2.genarchi.3istor.com` | `https://p3.genarchi.3istor.com` |
 
-Le dépôt contient le cadrage, les sources et les modèles de travail. **Aucune application ni infrastructure n’est encore exécutable.** L’application, les technologies, les environnements et les critères détaillés restent à confirmer. Aucune décision technique n’est acceptée et aucun test de résilience n’a été exécuté.
+Architectures et choix : [`docs/architecture/`](docs/architecture/README.md), [ADR](docs/adr/README.md). Contrats (API, événements, exécution, plateformes) : [`contracts/`](contracts/README.md).
 
-Le cours demande une application web résiliente en P2 et P3, deux livrables Terraform et environ trois suivis suivis d’une soutenance. Le kickoff propose une démarche MVP et des jalons internes ; ces propositions ne constituent pas une validation du professeur.
+## Démarrer (NixOS ou Ubuntu)
 
-## Commencer ici
+Tout passe par `make`. `make help` liste les cibles.
 
-1. Lire le [cadrage et les questions ouvertes](docs/cadrage.md).
-2. Consulter les [sources et leurs synthèses](docs/references/README.md).
-3. Préparer le [coaching du 3 novembre 2026](docs/coaching/2026-11-03-preparation.md).
-4. Consulter le [registre des décisions](docs/adr/README.md) avant de proposer une architecture.
-5. Pour contribuer avec un agent, lire [AGENTS.md](AGENTS.md).
+**NixOS** (ou tout Linux/macOS avec Nix) :
 
-## Organisation du dépôt
-
-```text
-app/                  Application commune, à concevoir
-infra/p2/             Infrastructure Terraform P2, à concevoir
-infra/p3/             Infrastructure Terraform P3, à concevoir
-tests/resilience/     Scénarios et relevés de preuves
-docs/
-  cadrage.md          Consignes, propositions, questions et jalons
-  references/         Supports PowerPoint originaux et synthèses
-  adr/                Registre et modèle de décision d’architecture
-  coaching/           Préparations et restitutions de coaching
-  comptes-rendus/     Comptes rendus des réunions d’équipe
+```bash
+nix develop          # ou `direnv allow` : OpenTofu, Python 3.13, uv, Ansible, gcloud, k6, shellcheck…
+make setup
 ```
 
-## Prochaines étapes
+**Ubuntu 24.04+** :
 
-- Faire préciser les critères de résilience, la distinction P2/P3 et le périmètre Terraform.
-- Confirmer les environnements autorisés, les accès, le budget et les dates officielles.
-- Choisir l’application et ses principes communs, puis consigner les choix validés dans les ADR.
+```bash
+scripts/bootstrap-ubuntu.sh   # paquets système, Docker, mise
+mise install                  # mêmes versions d'outils que le flake (mise.toml)
+make setup
+```
 
-Les questions sont suivies dans le cadrage pour éviter plusieurs listes divergentes. Les [coaching](docs/coaching/README.md) et [comptes rendus](docs/comptes-rendus/README.md) relient leurs conclusions à ces questions et aux ADR.
+`make doctor` vérifie que tout est en place.
 
-## Vérification et contribution
+## En local, sans compte cloud
 
-La documentation est en français et utilise des liens relatifs. Une modification doit préserver la distinction entre consigne, proposition, décision et résultat mesuré. Aucun outil applicatif, commande de déploiement ou pipeline CI n’est encore défini. Les contrôles actuels portent sur les liens, les sources et la cohérence documentaire ; ils ne prouvent aucun fonctionnement applicatif ou cloud.
+```bash
+make test               # tests de contrat (backend mémoire)
+make test-integration   # mêmes tests sur PostgreSQL, Firestore (émulateur) et RabbitMQ (piles up-p2/up-p3 arrêtées)
+make up-p2              # app « comme en P2 » : http://localhost:8080
+make up-p3              # app « comme en P3 » : http://localhost:8090
+make smoke-local        # parcours complet sur les deux piles
+make p2-lab             # configuration Ansible de la P2 jouée sur des conteneurs Debian 13
+make validate lint      # OpenTofu validate, ruff, shellcheck, frontière P2/P3
+```
+
+## Déployer sur GCP
+
+Une fois pour l'équipe : `make bootstrap` (bucket d'état OpenTofu partagé). Puis, depuis le poste de chacun :
+
+```bash
+cp infra/p3/env.mk.example infra/p3/env.mk   # P3_PROJECT, TF_STATE_BUCKET
+export CLOUDFLARE_API_TOKEN=…                 # DNS de 3istor.com
+make p3-deploy                                # image (Cloud Build) + infra + smoke
+
+cp infra/p2/env.mk.example infra/p2/env.mk   # P2_PROJECT, TF_STATE_BUCKET
+make p2-deploy                                # infra + configuration Ansible + smoke
+```
+
+Procédures d'exploitation : [`docs/runbooks/`](docs/runbooks/README.md). Aucun déploiement, aucune destruction ni injection de panne sans l'accord de l'équipe sur l'action et la cible.
+
+## Organisation
+
+```text
+app/                  Application (Python 3.13, FastAPI), un code, des adaptateurs par plateforme
+contracts/            API OpenAPI, événements CloudEvents, contrat d'exécution, engagements P2/P3
+infra/bootstrap/      Bucket d'état OpenTofu
+infra/p2/             OpenTofu (VM, réseau, LB) + Ansible (rôles) + labo local
+infra/p3/             OpenTofu (Cloud Run, Firestore, LB global, Eventarc…) + scripts canary
+docs/architecture/    Specs et challenge P2/P3          docs/adr/       Décisions
+docs/runbooks/        Exploitation                      docs/cadrage.md Consignes et questions ouvertes
+scripts/              Smoke test, sonde de résilience, vérification de frontière P2/P3
+tests/resilience/     Scénarios et preuves
+```
+
+Pour contribuer avec un agent : [AGENTS.md](AGENTS.md).

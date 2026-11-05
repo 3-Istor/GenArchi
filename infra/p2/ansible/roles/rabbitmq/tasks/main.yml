@@ -6,10 +6,10 @@
 - name: Ce nœud a-t-il déjà rejoint le cluster ?
   ansible.builtin.stat:
     path: /var/lib/rabbitmq/.genarchi-cluster
-  register: joined
+  register: rabbitmq_joined
 
 - name: Première configuration (le paquet démarre un nœud isolé, avec son propre cookie)
-  when: not joined.stat.exists
+  when: not rabbitmq_joined.stat.exists
   block:
     - name: Arrêter le nœud isolé
       ansible.builtin.systemd_service:
@@ -69,16 +69,16 @@
 
 - name: Attendre que les trois nœuds forment le cluster
   ansible.builtin.command: rabbitmqctl cluster_status --formatter json
-  register: status
+  register: rabbitmq_status
   changed_when: false
   retries: 24
   delay: 5
-  until: status.rc == 0 and (status.stdout | from_json).running_nodes | length == groups['rabbitmq'] | length
+  until: rabbitmq_status.rc == 0 and (rabbitmq_status.stdout | from_json).running_nodes | length == groups['rabbitmq'] | length
 
 - name: Marquer le nœud comme membre du cluster
   ansible.builtin.copy:
     dest: /var/lib/rabbitmq/.genarchi-cluster
-    content: "{{ (status.stdout | from_json).running_nodes | join(',') }}\n"
+    content: "membre du cluster genarchi\n"
     mode: "0644"
 
 - name: Comptes (définis une fois, répliqués par le cluster)

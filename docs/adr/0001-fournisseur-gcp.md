@@ -1,10 +1,10 @@
 # ADR 0001 — Fournisseur cloud : Google Cloud
 
-- Statut : proposé
+- Statut : accepté
 - Date de proposition : 2026-11-02
 - Auteur(s) : tech leads (noms à confirmer, Q-008)
 - Questions concernées : [Q-004](../cadrage.md#registre-des-questions-ouvertes)
-- Validation : à confirmer (date, validateurs et lien vers CR/restitution)
+- Validation : acceptée au coaching 1 du 2026-11-03 (professeur), information rapportée par Brian Perret le 2026-11-04 ; restitution écrite à rédiger
 - Remplace / remplacée par : sans objet
 
 ## Contexte
@@ -23,7 +23,7 @@ Plus de cluster on-prem disponible. Le kickoff cite AWS et OpenStack comme piste
 
 Proposer GCP pour les deux plateformes, dans deux projets séparés.
 
-Ce choix n'est pas accepté tant que l'équipe ne l'a pas validé explicitement.
+Accepté au coaching du 3 novembre (voir l'en-tête).
 
 ## Conséquences
 

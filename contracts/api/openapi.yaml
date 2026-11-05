@@ -99,6 +99,7 @@ paths:
           description: Curseur opaque renvoyé par la page précédente
           schema: { type: string }
       responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
         "200":
           description: Page d'événements, triés par `starts_at` croissant
           content:
@@ -115,6 +116,7 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/EventCreate" }
       responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
         "201":
           description: Créé
           headers:
@@ -133,6 +135,7 @@ paths:
       operationId: getEvent
       summary: Détail d'un événement
       responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
         "200":
           description: L'événement
           content:
@@ -164,6 +167,7 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/OrderCreate" }
       responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
         "201":
           description: Commande créée
           headers:
@@ -206,6 +210,7 @@ paths:
       operationId: getOrder
       summary: Détail d'une commande et de ses billets
       responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
         "200":
           description: La commande
           content:
@@ -221,6 +226,7 @@ paths:
       operationId: getTicket
       summary: Détail d'un billet
       responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
         "200":
           description: Le billet
           content:
@@ -267,6 +273,7 @@ paths:
       summary: Contrôle d'entrée (idempotent, invariant I3)
       security: [{ staffToken: [] }, { adminToken: [] }]
       responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
         "200":
           description: Premier scan, billet validé
           content:
@@ -304,6 +311,7 @@ paths:
       summary: Compteurs de ventes et de scans d'un événement
       security: [{ adminToken: [] }]
       responses:
+        "503": { $ref: "#/components/responses/Unavailable" }
         "200":
           description: Compteurs de l'événement
           content:
@@ -375,6 +383,15 @@ components:
       schema: { type: string }
 
   responses:
+    Unavailable:
+      description: >-
+        Dépendance momentanément indisponible, par exemple pendant une bascule de base (`code` = `unavailable`).
+        En-tête `Retry-After`. Rejouer un achat avec la même `Idempotency-Key` est sans risque.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
     NotFound:
       description: Ressource introuvable (`code` = `not_found`)
       content:

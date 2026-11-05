@@ -38,7 +38,7 @@ Règle d'or : **la même application tourne sur les deux plateformes**. Seuls ch
 
 ## Version courante
 
-`contract_version: 0.1.0`
+`contract_version: 0.2.0`
 
 ## Points ouverts (à trancher avant la 1.0)
 
