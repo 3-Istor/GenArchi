@@ -33,8 +33,8 @@ test: ## Tests unitaires et de contrat (backend mémoire)
 	cd $(APP) && uv run --all-extras pytest -q
 
 test-integration: services ## Tests sur PostgreSQL, Firestore (émulateur) et RabbitMQ
-	cd $(APP) && TEST_DATABASE_URL=postgresql://genarchi:genarchi@localhost:55432/genarchi \
-	  FIRESTORE_EMULATOR_HOST=localhost:8681 TEST_AMQP_URL=amqp://genarchi:genarchi@localhost:55672/ \
+	cd $(APP) && TEST_DATABASE_URL=postgresql://genarchi:genarchi@localhost:25432/genarchi \
+	  FIRESTORE_EMULATOR_HOST=localhost:8681 TEST_AMQP_URL=amqp://genarchi:genarchi@localhost:25672/ \
 	  uv run --all-extras pytest -q
 
 validate: ## `tofu validate` des deux plateformes (sans compte GCP)
