@@ -1,5 +1,8 @@
 # Outils pour Ubuntu (et toute machine sans Nix). Mêmes versions que flake.nix (nixos-26.05).
 # Installation : scripts/bootstrap-ubuntu.sh, puis `mise install`.
+# Verified with 2026.11.7; 2025.8.20 picks the free-threaded python build and fails.
+min_version = "2026.11.7"
+
 [tools]
 opentofu = "1.11.14"
 python = "3.13"

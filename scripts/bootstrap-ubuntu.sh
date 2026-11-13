@@ -21,6 +21,9 @@ echo "==> mise (gestionnaire de versions)"
 if ! command -v mise >/dev/null; then
   curl -fsSL https://mise.run | sh
   export PATH="$HOME/.local/bin:$PATH"
+else
+  # mise 2025.8 picks the free-threaded Python build, which fails to install.
+  mise self-update --yes || echo "   Mise à jour de mise impossible : la faire via son gestionnaire (voir min_version dans mise.toml)." >&2
 fi
 
 echo "==> Outils du projet (versions figées dans mise.toml)"
