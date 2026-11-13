@@ -1,21 +1,22 @@
 # Préparation du coaching du mardi 17 novembre 2026
 
-Proposition de préparation. Horaire, participants et porteurs à confirmer. Le [compte rendu du 3 novembre](2026-11-03-restitution.md) et les [diapositives présentées](2026-11-03-coaching-1.pptx) servent de point de départ. La billetterie commune est retenue pour l’étude. Les architectures et les objectifs chiffrés restent à confirmer.
+Présentation sur slides, sans démonstration en direct. Horaire, participants et porteurs à confirmer.
 
-## Éléments à préparer avant mardi
+Le [support PowerPoint](2026-11-17-coaching-2.pptx) présente la billetterie commune et les deux plateformes développées. Les schémas s’appuient sur la branche d’implémentation au commit `e2daaf9`. Le [compte rendu du 3 novembre](2026-11-03-restitution.md) donne le contexte des arbitrages.
 
-1. **Définir le parcours de démonstration (Q-006, Q-007).** Proposer un achat qui décrémente le stock et confirme un billet. Délimiter ce qui doit fonctionner dès le MVP pour la génération du QR code et le scan unique, présentés en diapositive 2. Fixer les règles à vérifier après une panne, dont la conservation des achats confirmés et l’absence de doublon à la relance.
-2. **Annoter les deux schémas (Q-002, Q-003, Q-004, Q-009).** Reprendre les diapositives 3 et 4 et suivre le trajet d’un achat jusqu’à sa persistance. En P2, distinguer les quorums de la base et de la messagerie, la bascule prévue et la remise en état manuelle. En P3, vérifier la portée géographique et les dépendances de chaque service envisagé, notamment pour la base et les événements. Pour les deux plateformes, préciser ce que Terraform doit provisionner et ce qui dépend d’outils ou de procédures complémentaires. Relever les accès, crédits et quotas à vérifier.
-3. **Préparer une fiche de panne de base commune (Q-001, Q-009, Q-010).** Partir d’un achat confirmé et suivre les requêtes avant, pendant et après la panne, dont une tentative d’achat pendant l’interruption et sa relance. Comparer le temps de reprise observé, les billets et le stock avant/après, les doublons et les interventions manuelles. Proposer des objectifs RTO/RPO justifiés par l’ouverture des ventes ou la proximité de l’événement. Préciser le mode de panne comparable et réalisable sur chaque cible. Si la panne de base s’avère difficile à reproduire, proposer la perte d’une instance applicative comme scénario de repli et expliciter le périmètre couvert. S’appuyer sur les [modèles de scénario et de preuve](../../tests/resilience/README.md).
+## Déroulé proposé
 
-## Arbitrages à obtenir pendant le coaching
+| Diapositives | Sujet | Éléments à présenter |
+| --- | --- | --- |
+| 1 à 3 | État et architectures | Parcours d’achat jusqu’à l’émission du QR. P2 sur VM avec bascule PostgreSQL par Patroni et vérification par l’équipe. P3 sur Cloud Run avec Firestore multirégion et émission événementielle. |
+| 4 | Achat interrompu | La confirmation n’arrive pas. La même requête est rejouée avec sa clé d’idempotence et le stock et les billets sont contrôlés. Le symptôme métier est commun. La panne technique proposée diffère, avec perte du primaire PostgreSQL en P2 et perte d’accès à Firestore depuis une région en P3. |
+| 5 | Début de PRA | Détection, rétablissement, vérification des ventes et restauration en cas de corruption. Les objectifs de reprise pour la panne ciblée et les responsables d’incident restent à valider. |
+| 6 | Arbitrages | Frontière P2/P3, comparabilité des pannes, preuves attendues, acceptation d’OpenTofu et Ansible, échéance et format de la soutenance. |
 
-| Questions | Arbitrage recherché |
-| --- | --- |
-| Q-002, Q-003 | L’usage d’une bascule automatique de la base et d’un répartiteur managé est-il compatible avec la P2 proposée ? Quel périmètre doit couvrir chacun des deux livrables Terraform ? |
-| Q-001, Q-009, Q-010 | Une panne ciblée de la couche de données avec les mêmes opérations métier est-elle adaptée à la comparaison ? Quelles observations présenter en soutenance ? |
-| Q-005 | Que désigne exactement le 12 janvier et en quelle année ? Quel créneau, quels critères et quel format de démonstration sont attendus ? |
+## Preuves et prochaines vérifications
 
-## Sortie attendue
+- **P2.** La branche d’implémentation documente un essai en conteneurs sous cinq achats par seconde. La perte du primaire a entraîné 43 secondes de réponses 503, avec un stock cohérent et aucun billet perdu. L’essai cloud reste à confirmer.
+- **P3.** La branche documente une validation statique de l’infrastructure et des essais applicatifs sur émulateurs. Le routage de secours sur GCP reste à vérifier. Le test de mise en indisponibilité de l’API d’une région documenté dans le runbook vérifie le routage, sans simuler la perte de Firestore.
+- **Comparaison.** Préparer une chronologie des achats, vérifier la conservation des commandes confirmées et l’absence de doublon après rejeu, puis relever les interventions humaines. Utiliser les [modèles de scénario et de preuve](../../tests/resilience/README.md) pour consigner les résultats d’un essai autorisé.
 
-Consigner le scénario prioritaire, les limites et questions encore ouvertes, les choix confirmés et les prochaines actions avec leurs porteurs et leurs échéances. Reporter les réponses dans le [cadrage](../cadrage.md) et tracer les choix de l’équipe dans le [registre des ADR](../adr/README.md). Les fiches préparées décrivent les observations à recueillir lors de futurs essais.
+Reporter les réponses dans le [cadrage](../cadrage.md), notamment Q-001 à Q-005, Q-009 et Q-010. Consigner les actions avec leurs porteurs et échéances.
