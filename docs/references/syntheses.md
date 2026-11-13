@@ -61,3 +61,14 @@ Source : [P3 — Architecture & Production](originaux/cours-4-p3-architecture-pr
 - **Exploitation** — diapositives 43–52 : traitements, capacité, environnements, tests de reprise, rôles et gestion des changements/incidents ; la diapositive 51 mentionne la procédure de rollback.
 
 À retenir : préparer des preuves de comportement en panne, d’observation et de remise en état. La présence d’un conteneur ne suffit pas à démontrer l’auto-reprise.
+
+## Premier coaching
+
+Source — [support présenté le 3 novembre 2026](../coaching/2026-11-03-coaching-1.pptx). Les schémas et comportements décrivent les propositions de l’équipe au moment du coaching.
+
+- Diapositives 1 et 2. Deux livrables Terraform et un parcours de billetterie commun. Acheter des billets décrémente le stock, la génération du QR code suit l’achat et le contrôle à l’entrée n’accepte le billet qu’une fois.
+- Diapositive 3. P2 proposée sur deux sites et un site témoin, modélisés par trois zones d’une région Google Cloud. Les équipes exploitent les VM, PostgreSQL avec Patroni, le NAS et RabbitMQ. Le schéma prévoit une bascule automatique de la base et des interventions d’exploitation.
+- Diapositive 4. P3 proposée sur deux régions actives avec Cloud Run, Firestore multirégion, Eventarc et Pub/Sub, et stockage objet. Le schéma propose une exploitation automatisée.
+- Diapositives 5 et 6. Le comparatif distingue les réactions prévues et les actions humaines. Les chiffres de reprise et les fréquences de test présentés sont des hypothèses à confirmer et à mesurer. Les questions portent sur la frontière P2/P3, les pannes, les preuves et la soutenance.
+
+Les retours des enseignants sont consignés dans le [compte rendu](../coaching/2026-11-03-restitution.md).

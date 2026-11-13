@@ -10,6 +10,15 @@ Les cinq fichiers ci-dessous sont des copies inchangées des supports fournis. L
 | [Cours 3](originaux/cours-3-p2-middleware.pptx) | GEN ARCHI - Cours 3 - Plateforme 2 - Middleware.pptx | 25 | [Cours 3](syntheses.md#cours-3) |
 | [Cours 4](originaux/cours-4-p3-architecture-production.pptx) | GEN ARCHI - Cours 4 - Plateforme 3 - Architecture & Production.pptx | 52 | [Cours 4](syntheses.md#cours-4) |
 
+## Premier coaching
+
+| Source | Version | Diapositives | Synthèse |
+| --- | --- | --- | --- |
+| [Support préparatoire](../coaching/2026-11-03-coaching-1-preparation.pptx) | Version initialement présente dans le dépôt | 5 | [Préparation du 3 novembre](../coaching/2026-11-03-preparation.md) |
+| [Support présenté](../coaching/2026-11-03-coaching-1.pptx) | Fichier transmis après le coaching, conservé à l’identique | 6 | [Synthèse du support présenté](syntheses.md#premier-coaching) |
+
+Le [compte rendu du 3 novembre](../coaching/2026-11-03-restitution.md) restitue les échanges à partir de la transcription fournie.
+
 ## Usage et limites
 
 - Le cours 1 énonce le TD. Les autres cours apportent du contexte pédagogique ; leurs exemples ne constituent pas tous des composants obligatoires du projet.

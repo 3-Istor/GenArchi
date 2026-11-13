@@ -1,6 +1,6 @@
 # Décisions d’architecture
 
-**Aucune ADR technique n’est enregistrée ou acceptée au 2 novembre 2026.** Les exemples du kickoff ne valent pas décision.
+**Aucune ADR technique n’est enregistrée.** Le [premier coaching](../coaching/2026-11-03-restitution.md) retient la billetterie comme cas d’étude. Les architectures présentées restent des propositions.
 
 ## Créer et faire évoluer une ADR
 
@@ -17,4 +17,4 @@ Statuts autorisés : **proposé**, **accepté**, **rejeté**, **remplacé**. Le 
 | Numéro | Sujet | Statut | Date de validation | Preuve de validation |
 | --- | --- | --- | --- | --- |
 
-Sujets à instruire après coaching : application commune, environnements P2/P3, persistance, architecture de chaque plateforme et protocole de résilience. Cette liste ne préjuge d’aucun choix.
+Sujets à instruire après coaching : périmètre de la billetterie commune, environnements P2/P3, persistance, architecture de chaque plateforme et protocole de résilience. Cette liste ne préjuge d’aucun choix.

@@ -11,6 +11,6 @@
 
 Lors de la copie d’un modèle dans un sous-dossier, adapter ses liens relatifs à sa nouvelle position et remplacer les champs à compléter avant usage.
 
-Pour comparer P2/P3, conserver un parcours et une panne comparables, tout en précisant les différences de cible et de protocole. La perte d’une instance applicative est une proposition du [kickoff, diapositive 6](../../docs/references/originaux/kickoff.pptx), à confirmer au coaching.
+Pour comparer P2/P3, conserver un parcours et une panne comparables, tout en précisant les différences de cible et de protocole. Le [premier coaching](../../docs/coaching/2026-11-03-restitution.md) a discuté la panne de base de données et laisse le choix des scénarios à l’équipe. La [préparation du 17 novembre](../../docs/coaching/2026-11-17-preparation.md) propose une panne de base à instruire, avec la perte d’une instance applicative comme scénario de repli.
 
 Résultats possibles d’un relevé : **non exécuté**, **réussi**, **échoué**, **non concluant**. Une revue documentaire ou un déploiement réussi ne vaut pas preuve de résilience.

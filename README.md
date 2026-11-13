@@ -2,17 +2,15 @@
 
 Projet pédagogique : concevoir une application web résiliente, la déployer en Platform 2 (P2) et Platform 3 (P3), puis expliquer les différences à partir de preuves observées.
 
-## État au 2 novembre 2026
+## État après le premier coaching
 
-Le dépôt contient le cadrage, les sources et les modèles de travail. **Aucune application ni infrastructure n’est encore exécutable.** L’application, les technologies, les environnements et les critères détaillés restent à confirmer. Aucune décision technique n’est acceptée et aucun test de résilience n’a été exécuté.
-
-Le cours demande une application web résiliente en P2 et P3, deux livrables Terraform et environ trois suivis suivis d’une soutenance. Le kickoff propose une démarche MVP et des jalons internes ; ces propositions ne constituent pas une validation du professeur.
+Le [coaching du 3 novembre](docs/coaching/2026-11-03-restitution.md) retient une billetterie commune pour comparer les deux plateformes en situation de panne. Les schémas P2/P3 présentés sont des propositions. Le dépôt contient la documentation et les modèles de travail. L’application, les déploiements Terraform et les preuves de résilience restent à produire.
 
 ## Commencer ici
 
 1. Lire le [cadrage et les questions ouvertes](docs/cadrage.md).
 2. Consulter les [sources et leurs synthèses](docs/references/README.md).
-3. Préparer le [coaching du 3 novembre 2026](docs/coaching/2026-11-03-preparation.md).
+3. Consulter le [compte rendu du 3 novembre](docs/coaching/2026-11-03-restitution.md) et la [préparation proposée pour le 17 novembre](docs/coaching/2026-11-17-preparation.md).
 4. Consulter le [registre des décisions](docs/adr/README.md) avant de proposer une architecture.
 5. Pour contribuer avec un agent, lire [AGENTS.md](AGENTS.md).
 
@@ -33,11 +31,9 @@ docs/
 
 ## Prochaines étapes
 
-- Faire préciser les critères de résilience, la distinction P2/P3 et le périmètre Terraform.
-- Confirmer les environnements autorisés, les accès, le budget et les dates officielles.
-- Choisir l’application et ses principes communs, puis consigner les choix validés dans les ADR.
-
-Les questions sont suivies dans le cadrage pour éviter plusieurs listes divergentes. Les [coaching](docs/coaching/README.md) et [comptes rendus](docs/comptes-rendus/README.md) relient leurs conclusions à ces questions et aux ADR.
+- Définir le parcours minimal de billetterie et les données à préserver en cas de panne.
+- Préciser les responsabilités de reprise, le périmètre Terraform et la faisabilité des deux architectures.
+- Préparer un scénario de panne de données comparable sur P2 et P3, puis faire arbitrer le périmètre au prochain coaching.
 
 ## Vérification et contribution
 
