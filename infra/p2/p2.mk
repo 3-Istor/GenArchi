@@ -21,6 +21,8 @@ p2-plan: p2-init ## P2 : plan
 	$(P2_TOFU) plan $(P2_TFVARS)
 
 p2-apply: p2-init ## P2 : crée ou met à jour les VM, le réseau et les load balancers
+	# A fresh project lacks the APIs that google_project_service itself calls.
+	gcloud services enable cloudresourcemanager.googleapis.com serviceusage.googleapis.com --project $(P2_PROJECT)
 	$(P2_TOFU) apply -input=false $(P2_TFVARS)
 
 p2-inventory: ## P2 : génère l'inventaire Ansible et la config SSH (bastion via IAP)

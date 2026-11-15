@@ -18,6 +18,8 @@ p3-plan: p3-init ## P3 : plan
 	$(P3_TOFU) plan $(P3_TFVARS) -var app_image="$$(cat $(P3_DIR)/.image 2>/dev/null)" -var app_version=$(P3_VERSION)
 
 p3-registry: p3-init
+	# A fresh project lacks the APIs that google_project_service itself calls.
+	gcloud services enable cloudresourcemanager.googleapis.com serviceusage.googleapis.com --project $(P3_PROJECT)
 	$(P3_TOFU) apply -input=false -auto-approve $(P3_TFVARS) \
 	  -target=google_project_service.apis -target=google_artifact_registry_repository.app
 
