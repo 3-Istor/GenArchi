@@ -42,6 +42,7 @@ make up-p2              # app « comme en P2 » : http://localhost:8080
 make up-p3              # app « comme en P3 » : http://localhost:8090
 make smoke-local        # parcours complet sur les deux piles
 make p2-lab             # configuration Ansible de la P2 jouée sur des conteneurs Debian 13
+make p2-lab-chaos KILL=db-2   # panne sous charge sur le labo (sonde, kill, remise)
 make validate lint      # OpenTofu validate, ruff, shellcheck, frontière P2/P3
 ```
 

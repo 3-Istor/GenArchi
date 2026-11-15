@@ -42,7 +42,7 @@ def _postgres_store():
         pytest.skip("TEST_DATABASE_URL non défini")
     from genarchi.adapters.postgres import PostgresStore
 
-    store = PostgresStore(url, max_size=20)
+    store = PostgresStore(url)
     store.migrate()
     with store.pool.connection() as c:
         c.execute("TRUNCATE tickets, orders, events CASCADE")

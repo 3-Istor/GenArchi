@@ -4,7 +4,8 @@
 
 Crée un événement, envoie `rate` commandes par seconde (chacune avec sa clé d'idempotence, rejouée une fois
 en cas d'échec comme le ferait un client), puis affiche : taux de succès, plus longue interruption,
-billets émis à la fin. Sans dépendance : bibliothèque standard Python.
+sort des commandes en échec une fois rejouées après la panne, billets émis à la fin.
+Sans dépendance : bibliothèque standard Python.
 """
 
 import argparse
@@ -58,14 +59,14 @@ def main():
     if st != 201:
         raise SystemExit(f"création d'événement impossible ({st})")
     ok = ko = streak = 0
-    tickets, last_ok, worst_gap = [], time.monotonic(), 0.0
+    tickets, failed, last_ok, worst_gap = [], [], time.monotonic(), 0.0
+    url, body = f"{a.base}/events/{ev['id']}/orders", {"buyer_email": "probe@example.com", "quantity": 1}
     end = time.monotonic() + a.seconds
     while time.monotonic() < end:
         t0 = time.monotonic()
         key = uuid.uuid4().hex
         for _ in range(2):  # un essai + un rejeu idempotent
-            body = {"buyer_email": "probe@example.com", "quantity": 1}
-            st, order = call("POST", f"{a.base}/events/{ev['id']}/orders", body, {"Idempotency-Key": key})
+            st, order = call("POST", url, body, {"Idempotency-Key": key})
             if st in (200, 201):
                 break
         if st in (200, 201):
@@ -78,12 +79,16 @@ def main():
             last_ok = time.monotonic()
         else:
             ko += 1
+            failed.append(key)
             if not streak:
                 print(f"{datetime.now():%H:%M:%S} échecs (HTTP {st})…", flush=True)
             streak += 1
         time.sleep(max(0.0, 1 / a.rate - (time.monotonic() - t0)))
     worst_gap = max(worst_gap, time.monotonic() - last_ok)
     time.sleep(10)
+    # Like a real client, replay each failed key once the service is back: 200 means the order had been stored
+    # although the client saw a failure, 201 that it had not and is stored now.
+    late = [call("POST", url, body, {"Idempotency-Key": k})[0] for k in failed]
     issued = sum(1 for t in tickets[-50:] if call("GET", f"{a.base}/tickets/{t}")[1].get("status") == "issued")
     _, evn = call("GET", f"{a.base}/events/{ev['id']}")
     print(
@@ -93,7 +98,10 @@ def main():
                 "commandes_en_echec": ko,
                 "succes_pct": round(100 * ok / max(1, ok + ko), 2),
                 "plus_longue_interruption_s": round(worst_gap, 1),
-                "stock_coherent": evn["capacity"] - evn["remaining"] == ok,
+                "echecs_deja_enregistres": late.count(200),
+                "echecs_enregistres_au_rejeu": late.count(201),
+                "echecs_toujours_refuses": len(late) - late.count(200) - late.count(201),
+                "stock_coherent": evn["capacity"] - evn["remaining"] == ok + late.count(200) + late.count(201),
                 "billets_emis_sur_50_derniers": issued,
             },
             ensure_ascii=False,

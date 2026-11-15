@@ -143,11 +143,12 @@ resource "google_cloud_run_v2_service" "worker" {
 # Un trigger par région : chaque événement est livré aux deux workers, l'émission étant idempotente (I5)
 # le doublon ne coûte qu'une lecture. Une région perdue n'arrête pas l'émission.
 resource "google_eventarc_trigger" "ticket_created" {
-  for_each                = toset(var.regions)
-  name                    = "${var.name_prefix}-ticket-created-${each.value}"
-  location                = var.firestore_location
-  service_account         = local.sa.events
-  event_data_content_type = "application/json"
+  for_each        = toset(var.regions)
+  name            = "${var.name_prefix}-ticket-created-${each.value}"
+  location        = var.firestore_location
+  service_account = local.sa.events
+  # Firestore events only come as protobuf; the worker reads the ce-subject header, never the body.
+  event_data_content_type = "application/protobuf"
 
   matching_criteria {
     attribute = "type"

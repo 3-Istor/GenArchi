@@ -15,6 +15,7 @@ resource "google_compute_region_network_endpoint_group" "api" {
 }
 
 resource "google_compute_security_policy" "edge" {
+  count       = var.cloud_armor ? 1 : 0
   name        = "${var.name_prefix}-edge"
   description = "WAF et limitation de débit devant l'API"
   type        = "CLOUD_ARMOR"
@@ -70,7 +71,7 @@ resource "google_compute_backend_service" "api" {
   name                  = "${var.name_prefix}-api"
   load_balancing_scheme = "EXTERNAL_MANAGED"
   protocol              = "HTTPS"
-  security_policy       = google_compute_security_policy.edge.id
+  security_policy       = var.cloud_armor ? google_compute_security_policy.edge[0].id : null
 
   dynamic "backend" {
     for_each = google_compute_region_network_endpoint_group.api

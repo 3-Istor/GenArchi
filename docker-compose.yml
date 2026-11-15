@@ -3,6 +3,7 @@
 #   make up-p3   -> émulateurs Firestore/Pub/Sub + API + worker      http://localhost:8090
 #   make services -> uniquement les dépendances, pour les tests d'intégration
 # Images servies par mirror.gcr.io (cache Google de Docker Hub) pour éviter la limite de téléchargements.
+# Host ports stay below 49152: Windows (Hyper-V/WSL) reserves random ranges above it.
 
 x-app: &app
   image: genarchi-app:local
@@ -22,14 +23,14 @@ services:
   postgres:
     image: mirror.gcr.io/library/postgres:17-alpine
     environment: { POSTGRES_USER: genarchi, POSTGRES_PASSWORD: genarchi, POSTGRES_DB: genarchi }
-    ports: ["55432:5432"]
+    ports: ["25432:5432"]
     healthcheck: { test: ["CMD", "pg_isready", "-U", "genarchi"], interval: 2s, retries: 30 }
     profiles: ["p2", "services"]
 
   rabbitmq:
     image: mirror.gcr.io/library/rabbitmq:4.1-management-alpine
     environment: { RABBITMQ_DEFAULT_USER: genarchi, RABBITMQ_DEFAULT_PASS: genarchi }
-    ports: ["55672:5672", "15672:15672"]
+    ports: ["25672:5672", "15672:15672"]
     healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 5s, retries: 30 }
     profiles: ["p2", "services"]
 
