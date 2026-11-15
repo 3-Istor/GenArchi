@@ -83,6 +83,15 @@ resource "google_service_account_iam_member" "chaos_acts_as_api" {
   member             = "serviceAccount:${local.sa.chaos}"
 }
 
+# Updating an env var creates a revision, which needs to read the image.
+resource "google_artifact_registry_repository_iam_member" "chaos_reads_images" {
+  count      = var.chaos_enabled ? 1 : 0
+  location   = google_artifact_registry_repository.app.location
+  repository = google_artifact_registry_repository.app.name
+  role       = "roles/artifactregistry.reader"
+  member     = "serviceAccount:${local.sa.chaos}"
+}
+
 # Pub/Sub écrit dans BigQuery avec son agent de service.
 resource "google_bigquery_dataset_iam_member" "pubsub_writes_sales" {
   dataset_id = google_bigquery_dataset.sales.dataset_id
