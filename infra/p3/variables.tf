@@ -93,6 +93,12 @@ variable "alert_email" {
   default     = ""
 }
 
+variable "cloud_armor" {
+  description = "WAF + limitation de débit devant l'API ; false seulement sur un projet dont le quota Cloud Armor est à 0"
+  type        = bool
+  default     = true
+}
+
 variable "labels" {
   type    = map(string)
   default = { platform = "p3", project = "genarchi" }
