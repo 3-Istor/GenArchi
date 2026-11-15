@@ -25,7 +25,7 @@ setup: ## Installe les dépendances Python de l'app et les collections Ansible
 lint: ## Lint app + OpenTofu + scripts + frontière P2/P3
 	cd $(APP) && uv run --all-extras ruff check . && uv run --all-extras ruff format --check .
 	$(TOFU) fmt -check -recursive infra
-	shellcheck scripts/*.sh infra/p2/scripts/*.sh infra/p3/scripts/*.sh
+	shellcheck scripts/*.sh infra/p2/scripts/*.sh infra/p2/lab/*.sh infra/p3/scripts/*.sh
 	python3 scripts/check_boundary.py
 	cd infra/p2/ansible && ANSIBLE_CONFIG=ansible.cfg uvx --quiet ansible-lint --offline site.yml app.yml ../lab/lab.yml
 

@@ -37,5 +37,8 @@ Cibles : `make p2-plan`, `p2-apply`, `p2-configure`, `p2-release`, `p2-deploy`, 
   | Nœud RabbitMQ tué | aucune erreur | file quorum servie par les 2 autres nœuds |
   | Serveur d'app tué | aucune erreur | Apache l'a retiré de la rotation |
   | Redémarrage de toutes les VM | — | cluster et services revenus seuls |
+  | Zone b perdue (`app-1b`, `db-2` réplica, `mq-2`), 2 essais | 0 puis 1 échec ; 3,2 puis 9,5 s d'attente, le temps que Patroni retire le mode synchrone (`loop_wait` 10 s). Au 2e essai, une commande décomptée sans succès vu par la sonde : à confirmer | tout est revenu seul, `db-2` en Sync Standby |
+
+  Rejouer une panne : `make p2-lab-chaos KILL="app-1b db-2 mq-2"` (sonde dans le réseau `p2lab`, `docker kill` puis `docker start` ; `AT`, `BACK`, `FOR` en secondes).
 
 - **Pas encore exécuté sur GCP** : `tofu apply`, LB et health checks Google, NFS noyau et bascule du disque régional, IAP / OS Login, certificat. Le labo remplace l'IP virtuelle PostgreSQL par HAProxy et le NAS par un volume partagé.

@@ -74,7 +74,11 @@ p2-lab: ## Labo : joue la configuration Ansible de la P2 sur des conteneurs Debi
 p2-lab-smoke: ## Labo : test de fumée à travers le reverse proxy
 	@s=$(P2_DIR)/lab/.secrets.json; scripts/smoke.sh http://10.20.0.11 "$$(jq -r .admin_token $$s)" "$$(jq -r .staff_token $$s)"
 
+p2-lab-chaos: ## Labo : panne sous charge (KILL="app-1b db-2 mq-2", AT=20, BACK=110, FOR=180 s)
+	@test -n "$(KILL)" || { echo 'KILL="hôte..." manquant, ex. make p2-lab-chaos KILL=db-2'; exit 1; }
+	$(P2_DIR)/lab/chaos.sh $(or $(FOR),180) $(or $(AT),20) $(or $(BACK),110) $(KILL)
+
 p2-lab-down: ## Labo : supprime les conteneurs
 	python3 $(P2_DIR)/lab/lab.py down
 
-.PHONY: p2-lab p2-lab-smoke p2-lab-down
+.PHONY: p2-lab p2-lab-smoke p2-lab-chaos p2-lab-down
