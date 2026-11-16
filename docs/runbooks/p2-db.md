@@ -12,9 +12,9 @@ Attendu : un `Leader` et un `Sync Standby`, `Lag in MB` à 0.
 
 ## Le primaire tombe (panne non planifiée)
 
-**Symptômes** : alerte Zabbix « db-x unreachable », erreurs 503 pendant ~30 s.
+**Symptômes** : alerte Zabbix « db-x unreachable », service interrompu environ 30 s (mesuré au labo le 2026-11-16) : requêtes lentes puis 503 `problem+json` avec `Retry-After`.
 
-Patroni bascule seul : le réplica synchrone devient primaire après l'expiration du verrou (30 s), la sonde du LB suit en ~6 s. L'humain **vérifie** et **réintègre** :
+Patroni bascule seul : le réplica synchrone devient primaire après l'expiration du verrou (`ttl` 20 s, [ADR 0018](../adr/0018-p2-reglages-de-bascule.md)), l'IP virtuelle suit en ~5 s et les pools de l'app se reconnectent en moins de 5 s. L'humain **vérifie** et **réintègre** :
 
 1. `make p2-db-status` : le nouveau primaire est `Leader`.
 2. `make p2-smoke` : vert.

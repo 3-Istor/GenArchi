@@ -9,14 +9,30 @@ from datetime import datetime
 from importlib import resources
 
 import psycopg
+import psycopg_pool.pool
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool, PoolTimeout
+from psycopg_pool.base import AttemptWithBackoff
 
 from .. import domain
 from ..domain import Event, EventStats, Order, Problem, Ticket, TicketStatus
 
 log = logging.getLogger("genarchi.postgres")
 MIGRATION_LOCK = 4242_0001
+
+
+class CappedAttempt(AttemptWithBackoff):
+    """Reconnection backoff of the pool, capped so a server is back at most 5 s after the database."""
+
+    MAX_DELAY = 5.0
+
+    def update_delay(self, now: float) -> None:
+        super().update_delay(now)
+        self.delay = min(self.delay, self.MAX_DELAY)
+
+
+# ponytail: swaps a psycopg_pool 3.3 internal (no max-delay option); test_pool_backoff fails if an upgrade breaks it.
+psycopg_pool.pool.AttemptWithBackoff = CappedAttempt
 
 
 def _event(r: dict) -> Event:

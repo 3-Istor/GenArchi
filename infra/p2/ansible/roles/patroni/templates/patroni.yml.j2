@@ -14,9 +14,11 @@ etcd3:
 
 bootstrap:
   dcs:
-    ttl: 30
-    loop_wait: 10
-    retry_timeout: 10
+    # Leader lock expires after 20 s (was 30/10/10); primary failover measured at ~30 s in the lab.
+    # Rule: loop_wait + 2 * retry_timeout <= ttl.
+    ttl: 20
+    loop_wait: 5
+    retry_timeout: 5
     maximum_lag_on_failover: 1048576
     # Réplication synchrone : un commit est écrit dans les deux DC (RPO = 0). Si le réplica tombe,
     # Patroni repasse en asynchrone plutôt que de bloquer les écritures (synchronous_mode_strict: false).

@@ -15,11 +15,12 @@
         Require all granted
     </Directory>
 
-    # Pool de serveurs d'application. Health check actif sur /readyz : un serveur arrêté, ou dont la base
-    # ne répond plus, sort de la rotation en ~10 s et y revient seul.
+    # Pool de serveurs d'application. Health check sur /healthz : seul un serveur dont le processus ne répond
+    # plus sort de la rotation (~10 s) ; il revient au premier contrôle réussi. Base absente : les serveurs
+    # restent en rotation et renvoient eux-mêmes un 503 JSON avec Retry-After.
     <Proxy "balancer://app">
 {% for h in groups['app'] %}
-        BalancerMember "http://{{ p2_hosts[h] }}:8080" route={{ h }} hcmethod=GET hcuri=/readyz hcinterval=5 hcfails=2 hcpasses=2 connectiontimeout=2 timeout=30 retry=10
+        BalancerMember "http://{{ p2_hosts[h] }}:8080" route={{ h }} hcmethod=GET hcuri=/healthz hcinterval=5 hcfails=2 hcpasses=1 connectiontimeout=2 timeout=30 retry=10
 {% endfor %}
         ProxySet lbmethod=byrequests failontimeout=On
     </Proxy>
@@ -27,6 +28,17 @@
     ProxyPreserveHost On
     ProxyPassMatch "{{ api_path_regex }}" "balancer://app/$1$2"
     ProxyPassReverse "/" "balancer://app/"
+
+    # Errors Apache produces itself (no server left, timeout): the app's JSON problem format.
+    # App responses are passed through untouched (no ProxyErrorOverride), Retry-After included.
+    ErrorDocument 502 /errors/502.json
+    ErrorDocument 503 /errors/503.json
+    ErrorDocument 504 /errors/504.json
+    # Retry-After set here only: a global setifempty misses backend headers and doubles the app's own.
+    <Location "/errors/">
+        ForceType application/problem+json
+        Header always set Retry-After "5"
+    </Location>
 
     # La sonde du LB ne passe pas par le WAF.
     <Location "/rp-health">
