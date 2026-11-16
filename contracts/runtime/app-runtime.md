@@ -83,7 +83,8 @@ Les tests de contrat sont lancés sur chaque profil : c'est ce qui prouve que P2
 | Fourniture | P2 | P3 |
 |---|---|---|
 | Entrée publique | LB régional (TLS) → Apache + ModSecurity (`rp-*`) → `app-*:8080` | LB global (TLS, Cloud Armor) → Cloud Run `api` (2 régions) |
-| Health check | `/readyz`, 5 s, 2 échecs = retiré | Probe de readiness Cloud Run sur `/readyz` (service health) |
+| Health check | Apache sur `/healthz`, 5 s : 2 échecs = retiré, 1 succès = réintégré. Base absente, le serveur reste en rotation et répond 503 `problem+json` avec `Retry-After: 2` | Probe de readiness Cloud Run sur `/readyz` (service health) |
+| Erreur du reverse proxy | Plus aucun serveur ou délai dépassé : 502/503/504 `problem+json` (`code: unavailable`) avec `Retry-After: 5` | Sans objet |
 | Variables d'env | `/etc/genarchi/genarchi.env` (0600) écrit par Ansible | Variables Cloud Run, secrets depuis Secret Manager |
 | Base | PostgreSQL 17 + Patroni, joint via `db.p2.genarchi.internal` (IP virtuelle) | Firestore `(default)` en `eur3` |
 | Blob | NFS monté sur `/mnt/tickets` (NAS actif, disque répliqué) | Bucket `BLOB_GCS_BUCKET` (dual-région) |

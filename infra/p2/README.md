@@ -32,12 +32,13 @@ Cibles : `make p2-plan`, `p2-apply`, `p2-configure`, `p2-release`, `p2-deploy`, 
 
   | Panne | Ce qu'a vu le client | Retour |
   |---|---|---|
-  | Primaire PostgreSQL tué | 43 s d'erreurs 503, aucune perte (stock cohérent, tous les billets émis) | Patroni a promu le réplica ; l'ancien primaire est revenu seul en réplica |
+  | Primaire PostgreSQL tué (réglages de l'[ADR 0018](../../docs/adr/0018-p2-reglages-de-bascule.md), 2026-11-16) | 30 s de coupure, contre 43 à 50 s avant ; 2 commandes sur 603 en échec, enregistrées au rejeu ; requêtes en délai dépassé plutôt qu'en 503, le pool attendant 5 s une connexion | Patroni a promu le réplica ; pools reconnectés 0 à 2 s après la base ; l'ancien primaire est revenu seul en réplica |
+  | Les deux serveurs d'app tués (2026-11-16) | 503 (et un 502) `problem+json` d'Apache avec `Retry-After: 5` | service rétabli 6 s après le redémarrage des serveurs (`hcpasses=1`) |
   | Bascule planifiée (`switchover`) | ~10 s d'interruption, réponses 503 (le client rejoue avec la même clé) | — |
   | Nœud RabbitMQ tué | aucune erreur | file quorum servie par les 2 autres nœuds |
   | Serveur d'app tué | aucune erreur | Apache l'a retiré de la rotation |
   | Redémarrage de toutes les VM | — | cluster et services revenus seuls |
-  | Zone b perdue (`app-1b`, `db-2` réplica, `mq-2`), 2 essais | 0 puis 1 échec ; 3,2 puis 9,5 s d'attente, le temps que Patroni retire le mode synchrone (`loop_wait` 10 s). Au 2e essai, une commande décomptée sans succès vu par la sonde : à confirmer | tout est revenu seul, `db-2` en Sync Standby |
+  | Zone b perdue (`app-1b`, `db-2` réplica, `mq-2`), 3 essais | avant l'ADR 0018 : 0 puis 1 échec, 3,2 puis 9,5 s d'attente, le temps que Patroni retire le mode synchrone (`loop_wait` 10 s) ; après : 0 échec, 2,5 s | tout est revenu seul, `db-2` en Sync Standby |
 
   Rejouer une panne : `make p2-lab-chaos KILL="app-1b db-2 mq-2"` (sonde dans le réseau `p2lab`, `docker kill` puis `docker start` ; `AT`, `BACK`, `FOR` en secondes).
 
