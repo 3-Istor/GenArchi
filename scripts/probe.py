@@ -17,6 +17,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 
+EXTRA_HEADERS: dict[str, str] = {}  # --header, sent with every request (e.g. X-GenArchi-Region)
+
+
 def call(method, url, body=None, headers=None, timeout=5):
     if not url.startswith(("http://", "https://")):
         raise ValueError(url)
@@ -24,7 +27,7 @@ def call(method, url, body=None, headers=None, timeout=5):
         url,
         method=method,
         data=json.dumps(body).encode() if body is not None else None,
-        headers={"Content-Type": "application/json", **(headers or {})},
+        headers={"Content-Type": "application/json", **EXTRA_HEADERS, **(headers or {})},
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 (URL fournie par l'opérateur)
@@ -41,7 +44,11 @@ def main():
     p.add_argument("admin_token")
     p.add_argument("--seconds", type=int, default=120)
     p.add_argument("--rate", type=float, default=5)
+    p.add_argument("--header", action="append", default=[], help="NOM:VALEUR, ajouté à chaque requête")
     a = p.parse_args()
+    for h in a.header:
+        name, _, value = h.partition(":")
+        EXTRA_HEADERS[name.strip()] = value.strip()
     now = datetime.now(UTC)
     st, ev = call(
         "POST",

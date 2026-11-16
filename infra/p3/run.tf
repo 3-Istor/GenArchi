@@ -244,7 +244,8 @@ resource "google_cloud_scheduler_job" "issue_pending" {
 }
 
 # --- Test de panne de région (T4), nocturne -------------------------------------------------------------
-# Le job rend l'API de la première région « non prête » pendant 10 min puis la rétablit.
+# Le job pose le drapeau chaos/<première région> pour 10 min : toutes les instances de l'API de cette région
+# deviennent « non prêtes » (readiness), sans nouvelle révision, et le drapeau expire seul.
 # Le LB doit basculer seul : c'est ce que vérifient l'uptime check et le SLO pendant la fenêtre.
 resource "google_cloud_run_v2_job" "chaos" {
   count               = var.chaos_enabled ? 1 : 0
@@ -256,28 +257,28 @@ resource "google_cloud_run_v2_job" "chaos" {
     task_count = 1
     template {
       service_account = local.sa.chaos
-      timeout         = "1200s"
-      max_retries     = 0
+      timeout         = "120s"
+      max_retries     = 1
       containers {
-        image   = "gcr.io/google.com/cloudsdktool/google-cloud-cli:stable"
-        command = ["bash", "-c"]
-        args = [<<-EOT
-          set -euo pipefail
-          svc="${var.name_prefix}-api"; region="${local.primary}"
-          restore() { gcloud run services update "$svc" --region "$region" --update-env-vars CHAOS_FORCE_UNREADY=false --quiet; }
-          trap restore EXIT
-          echo "chaos: $svc@$region devient non prêt pendant $${CHAOS_SECONDS}s"
-          gcloud run services update "$svc" --region "$region" --update-env-vars CHAOS_FORCE_UNREADY=true --quiet
-          sleep "$CHAOS_SECONDS"
-        EOT
-        ]
-        env {
-          name  = "CHAOS_SECONDS"
-          value = "600"
+        image = local.image
+        args  = ["chaos-region", "--region", local.primary, "--seconds", "600"]
+        dynamic "env" {
+          # Settings require tokens; this job serves no request, so placeholders avoid granting secret access.
+          for_each = merge(local.common_env, {
+            EVENTS_BACKEND = "none"
+            ADMIN_TOKEN    = "unused-by-chaos-job"
+            STAFF_TOKEN    = "unused-by-chaos-job"
+          })
+          content {
+            name  = env.key
+            value = env.value
+          }
         }
       }
     }
   }
+
+  depends_on = [google_project_iam_member.roles]
 }
 
 resource "google_cloud_scheduler_job" "chaos" {

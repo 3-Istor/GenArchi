@@ -48,10 +48,6 @@ variable "app_image" {
   default     = ""
 }
 
-variable "app_version" {
-  type    = string
-  default = "dev"
-}
 
 variable "min_instances" {
   description = "Instances minimales de l'API par région. >= 1 : requis par Cloud Run service health pour la bascule"
