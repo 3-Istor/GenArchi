@@ -41,6 +41,23 @@
     dest: /var/www/genarchi/
     mode: "0644"
 
+- name: Répertoire des erreurs JSON d'Apache
+  ansible.builtin.file:
+    path: /var/www/genarchi/errors
+    state: directory
+    mode: "0755"
+
+- name: Erreurs JSON d'Apache (même format que l'app)
+  ansible.builtin.copy:
+    dest: "/var/www/genarchi/errors/{{ item.status }}.json"
+    mode: "0644"
+    content: "{{ {'type': '/problems/unavailable', 'title': item.title, 'status': item.status, 'code': 'unavailable',
+      'detail': 'service momentanément indisponible, réessayer'} | to_json }}\n"
+  loop:
+    - { status: 502, title: Bad Gateway }
+    - { status: 503, title: Service Unavailable }
+    - { status: 504, title: Gateway Timeout }
+
 - name: Page de santé du reverse proxy (sonde du load balancer)
   ansible.builtin.copy:
     dest: /var/www/genarchi/rp-health
