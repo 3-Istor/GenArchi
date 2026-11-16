@@ -10,7 +10,7 @@ import re
 import threading
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from html import escape
 from typing import Annotated, Literal
 
@@ -145,6 +145,26 @@ class Chaos:
         return self.latency_ms / 1000 if time.monotonic() < self.latency_until else 0.0
 
 
+class RegionFlag:
+    """Region-wide unreadiness (P3 T4 test): chaos/<region>.unready_until, read at most every `ttl` seconds."""
+
+    def __init__(self, store, region: str, ttl: float = 5.0, clock=time.monotonic) -> None:
+        self.store, self.region, self.ttl, self.clock = store, region, ttl, clock
+        self.checked_at: float | None = None
+        self.until: datetime | None = None
+
+    def unready(self) -> bool:
+        now = self.clock()
+        if self.checked_at is None or now - self.checked_at >= self.ttl:
+            self.checked_at = now
+            try:
+                self.until = self.store.unready_until(self.region)
+            except Exception:  # readiness of the database is checked separately
+                log.warning("readiness: chaos flag unreadable", exc_info=True)
+                self.until = None
+        return self.until is not None and datetime.now(UTC) < self.until
+
+
 def _crash() -> None:
     time.sleep(0.2)
     os._exit(3)  # arrêt brutal volontaire : la plateforme doit remplacer l'instance
@@ -217,9 +237,11 @@ def create_app(c: Container) -> FastAPI:
     def healthz():
         return {"status": "ok"}
 
+    region_flag = RegionFlag(c.store, s.region) if s.region else None
+
     @app.get("/readyz")
     def readyz():
-        if s.chaos_force_unready or chaos.unready():
+        if s.chaos_force_unready or chaos.unready() or (region_flag and region_flag.unready()):
             return JSONResponse({"status": "not_ready", "checks": {"database": "fail", "chaos": "fail"}}, 503)
         try:
             c.store.ping()

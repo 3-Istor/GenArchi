@@ -52,6 +52,14 @@ class FirestoreStore:
     def ping(self) -> None:
         self.db.collection("events").limit(1).get(timeout=2)
 
+    # --- panne de région (test T4) : chaos/<région>.unready_until ----------------------------------
+    def unready_until(self, region: str) -> datetime | None:
+        snap = self.db.collection("chaos").document(region).get(timeout=2)
+        return snap.get("unready_until") if snap.exists else None
+
+    def set_unready_until(self, region: str, until: datetime) -> None:
+        self.db.collection("chaos").document(region).set({"unready_until": until})
+
     # --- événements -------------------------------------------------------------------------------
     def _stock(self, event_id: str):
         return self.db.collection("events").document(event_id).collection("stock")

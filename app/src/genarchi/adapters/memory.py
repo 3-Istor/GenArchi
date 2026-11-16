@@ -16,9 +16,16 @@ class MemoryStore:
         self.events: dict[str, Event] = {}
         self.orders: dict[str, Order] = {}
         self.tickets: dict[str, Ticket] = {}
+        self.chaos: dict[str, datetime] = {}
 
     def ping(self) -> None:
         return None
+
+    def unready_until(self, region: str) -> datetime | None:
+        return self.chaos.get(region)
+
+    def set_unready_until(self, region: str, until: datetime) -> None:
+        self.chaos[region] = until
 
     def create_event(self, event: Event) -> Event:
         with self._lock:
