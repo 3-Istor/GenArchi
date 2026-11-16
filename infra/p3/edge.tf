@@ -129,17 +129,18 @@ resource "google_compute_url_map" "https" {
     name            = "app"
     default_service = google_compute_backend_bucket.front.id
 
+    # Lists, not maps: Google wants route_rules in increasing priority order (key = index here).
     # Any path with X-GenArchi-Region goes to that region's backend (test traffic only).
     dynamic "route_rules" {
-      for_each = { for i, r in var.regions : r => i }
+      for_each = var.regions
       content {
-        priority = route_rules.value + 1
-        service  = google_compute_backend_service.api_region[route_rules.key].id
+        priority = route_rules.key + 1
+        service  = google_compute_backend_service.api_region[route_rules.value].id
         match_rules {
           prefix_match = "/"
           header_matches {
             header_name = "X-GenArchi-Region"
-            exact_match = route_rules.key
+            exact_match = route_rules.value
           }
         }
       }
@@ -147,13 +148,13 @@ resource "google_compute_url_map" "https" {
 
     # API paths without the header: the multi-region backend, as before. "/x/*" becomes prefix "/x/".
     dynamic "route_rules" {
-      for_each = { for i, p in local.api_paths : p => i }
+      for_each = local.api_paths
       content {
-        priority = route_rules.value + 100
+        priority = route_rules.key + 100
         service  = google_compute_backend_service.api.id
         match_rules {
-          prefix_match    = endswith(route_rules.key, "/*") ? trimsuffix(route_rules.key, "*") : null
-          full_path_match = endswith(route_rules.key, "/*") ? null : route_rules.key
+          prefix_match    = endswith(route_rules.value, "/*") ? trimsuffix(route_rules.value, "*") : null
+          full_path_match = endswith(route_rules.value, "/*") ? null : route_rules.value
         }
       }
     }

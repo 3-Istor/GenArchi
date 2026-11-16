@@ -16,6 +16,8 @@ make p3-deploy     # registre → image (Cloud Build) → infra complète → sm
 
 Le certificat géré par Google est émis 15 à 60 min après que `p3.genarchi.3istor.com` pointe sur le LB ; pendant ce temps `p3-smoke` échoue en TLS.
 
+Redéployer après un `make p3-destroy` : la base Firestore a été conservée (`ABANDON`) et l'`apply` échouerait (« Database already exists »). La rattacher d'abord : `make p3-import-db`, puis `make p3-deploy`.
+
 Créer les index Firestore et la base prend quelques minutes au premier `apply`.
 
 ## Mettre une version en production
