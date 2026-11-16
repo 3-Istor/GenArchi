@@ -25,9 +25,9 @@ git checkout <tag>
 make p3-canary
 ```
 
-Pour chaque région, l'une après l'autre : nouvelle révision sans trafic → 10 % du trafic pendant 5 min → si plus de 2 % de 5xx (contrat P3), **retour automatique** à la révision stable et arrêt ; sinon 100 %. Puis OpenTofu enregistre l'image (le worker et les jobs passent aussi à la nouvelle version).
+Pour chaque région, l'une après l'autre : nouvelle révision sans trafic → 10 % du trafic pendant 5 min, pendant lesquelles la canary génère elle-même du trafic (`scripts/probe.py`, 5 achats/s, en-tête `X-GenArchi-Region` qui fixe la région au LB) → **retour automatique** à la révision stable et arrêt si la révision canary a reçu moins de 30 requêtes ou plus de 2 % de 5xx (contrat P3) ; sinon 100 %. Puis OpenTofu enregistre l'image (le worker et les jobs passent aussi à la nouvelle version). `/version` affiche la version de l'image servie : on y voit la canary pendant la fenêtre.
 
-Réglages : `WATCH_SECONDS=600 MAX_ERROR_RATIO=0.01 make p3-canary`.
+Réglages : `WATCH_SECONDS=600 MAX_ERROR_RATIO=0.01 MIN_REQUESTS=50 make p3-canary`.
 
 ## Retour arrière manuel
 

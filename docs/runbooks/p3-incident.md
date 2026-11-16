@@ -13,7 +13,7 @@ Le budget d’erreur (0,1 % de requêtes en 5xx sur 28 jours) est consommé 10 f
 
 ## Test de panne de région (T4)
 
-Chaque nuit à 03:17 (Europe/Paris), le job `p3-chaos-region` rend l'API de la première région « non prête » pendant 10 minutes, puis la rétablit. Pendant la fenêtre : la sonde externe doit rester verte et le SLO ne pas bouger. C'est la preuve permanente que le PRA fonctionne.
+Chaque nuit à 03:17 (Europe/Paris), le job `p3-chaos-region` pose le document Firestore `chaos/<première région>` pour 10 minutes : toutes les instances de l'API de cette région répondent 503 sur `/readyz` (relu toutes les 5 s), sans nouvelle révision, et le drapeau expire seul. Pendant la fenêtre : la sonde externe doit rester verte et le SLO ne pas bouger. C'est la preuve permanente que le PRA fonctionne ([ADR 0019](../adr/0019-p3-panne-de-region-et-canary.md)).
 
 Le lancer à la demande (avec l'accord de l'équipe) :
 
@@ -23,6 +23,8 @@ make p3-chaos-region
 
 Observer : `GET https://p3.genarchi.3istor.com/version` répond depuis l'autre région en moins d'une minute.
 
-Arrêter le test en cours : `gcloud run jobs executions cancel <exécution> --region europe-west1`, puis `gcloud run services update p3-api --region europe-west1 --update-env-vars CHAOS_FORCE_UNREADY=false`.
+Observer une région précise : ajouter l'en-tête `X-GenArchi-Region: europe-west4` (ou `europe-west1`), que le LB route vers cette seule région.
+
+Arrêter le test en cours : reposer le drapeau à l'instant présent, `gcloud run jobs execute p3-chaos-region --region europe-west1 --args=chaos-region,--region,europe-west1,--seconds,0`. Les instances redeviennent prêtes en moins de 5 s.
 
 Désactiver : `chaos_enabled = false` (variable OpenTofu).

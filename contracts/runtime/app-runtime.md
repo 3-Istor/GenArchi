@@ -117,7 +117,8 @@ Les tests de contrat sont lancés sur chaque profil : c'est ce qui prouve que P2
 | `ADMIN_TOKEN` | oui | secret |
 | `STAFF_TOKEN` | oui | secret |
 | `CHAOS_ENABLED` | non | `false` (défaut) |
-| `CHAOS_FORCE_UNREADY` | non | `false` (défaut) ; `true` : `/readyz` renvoie toujours 503 (perte de région simulée, T4) |
+| `CHAOS_FORCE_UNREADY` | non | `false` (défaut) ; `true` : `/readyz` renvoie toujours 503 (usage local). En P3, la perte de région (T4) passe par le document Firestore `chaos/<région>` (`unready_until`), relu par `/readyz` au plus toutes les 5 s quand `REGION` est défini ([ADR 0019](../../docs/adr/0019-p3-panne-de-region-et-canary.md)) |
+| `APP_VERSION` | non | Inscrite dans l'image au build (`ARG`) ; en P3, plus injectée par OpenTofu, pour que chaque révision affiche sa version dans `/version` |
 | `INSTANCE_NAME` | non | `app-1a` (P2) ; sinon `K_REVISION` ou le nom d'hôte |
 | `ZONE` / `REGION` | non | `europe-west9-a` (P2) / `europe-west1` (P3) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | non | vide = pas d'export |

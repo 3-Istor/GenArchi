@@ -28,4 +28,5 @@ Cibles : `make p3-plan`, `p3-deploy`, `p3-canary`, `p3-smoke`, `p3-chaos-region`
 
 - `tofu validate` (providers google 8.x, cloudflare 5.x) ; attributs contrôlés contre le schéma des providers ; frontière P2/P3 respectée.
 - L'app tourne en local « comme en P3 » (émulateurs Firestore et Pub/Sub, `make up-p3 smoke-local`) et passe les tests de contrat sur Firestore, dont 200 achats concurrents sur 100 places.
-- **Pas encore exécuté sur GCP** : `tofu apply`, Eventarc Firestore, bascule *service health*, canary, chaos nocturne.
+- **GCP, 2026-11-15** (projet de test, sans Cloud Armor faute de quota) : `tofu apply` après trois correctifs ; smoke 10/10, billet émis en 8 s par Eventarc Firestore ; région retirée du LB pendant 10 min, 0 échec sur 4 407 commandes. L'ancien job de panne n'a produit aucune panne (révision jamais prête) et la canary a promu `europe-west4` sans trafic : d'où l'[ADR 0019](../../docs/adr/0019-p3-panne-de-region-et-canary.md) (drapeau Firestore, routage par en-tête, trafic de canary).
+- **Pas encore exécuté sur GCP** : le mécanisme de l'ADR 0019 (bascule *service health* sur drapeau, canary avec trafic), Cloud Armor.
