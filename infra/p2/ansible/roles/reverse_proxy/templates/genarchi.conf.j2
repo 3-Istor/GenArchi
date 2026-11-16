@@ -34,10 +34,11 @@
     ErrorDocument 502 /errors/502.json
     ErrorDocument 503 /errors/503.json
     ErrorDocument 504 /errors/504.json
+    # Retry-After set here only: a global setifempty misses backend headers and doubles the app's own.
     <Location "/errors/">
         ForceType application/problem+json
+        Header always set Retry-After "5"
     </Location>
-    Header always setifempty Retry-After "5" "expr=%{REQUEST_STATUS} in {'502', '503', '504'}"
 
     # La sonde du LB ne passe pas par le WAF.
     <Location "/rp-health">

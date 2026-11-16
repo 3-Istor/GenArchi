@@ -22,3 +22,5 @@ def test_pool_module_uses_capped_attempt():
     import psycopg_pool.pool
 
     assert psycopg_pool.pool.AttemptWithBackoff is CappedAttempt
+    # The swap only works while the pool still looks the name up when reconnecting.
+    assert "AttemptWithBackoff" in psycopg_pool.pool.ConnectionPool._add_connection.__code__.co_names

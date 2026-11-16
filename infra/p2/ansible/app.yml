@@ -1,5 +1,5 @@
 # Déploie une version de l'app : `make p2-release` (relance seulement cette partie).
-# Mise à jour serveur par serveur : Apache retire de la rotation le serveur arrêté (health check /readyz).
+# Mise à jour serveur par serveur : Apache retire de la rotation le serveur arrêté (health check /healthz).
 - name: Construire le paquet sur le poste qui lance le déploiement
   hosts: localhost
   connection: local

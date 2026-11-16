@@ -33,6 +33,6 @@ Statuts autorisés : **proposé**, **accepté**, **rejeté**, **remplacé**. Le 
 | [0015](0015-p2-clusters-etat-de-l-art.md) | P2 : clusters middleware « état de l'art » dans les VM | proposé | — | — |
 | [0016](0016-p3-evenement-emis-par-firestore.md) | P3 : l'événement « billet créé » est émis par Firestore | proposé | — | — |
 | [0017](0017-p2-substitutions-outils.md) | P2 : substitutions d'outils (Apache + ModSecurity, rsyslog, timers) | proposé | — | — |
-| [0018](0018-p2-reglages-de-bascule.md) | P2 : réglages de bascule (Patroni, pool, sonde Apache, erreurs JSON) | proposé | — | Décisions du tech lead du 2026-11-15, rapportées le 2026-11-16 |
+| [0018](0018-p2-reglages-de-bascule.md) | P2 : réglages de bascule (Patroni, pool, sonde Apache, erreurs JSON) | proposé | — | — |
 
 Sujets à instruire après coaching : application commune, environnements P2/P3, persistance, architecture de chaque plateforme et protocole de résilience. Cette liste ne préjuge d’aucun choix.

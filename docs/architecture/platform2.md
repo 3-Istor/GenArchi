@@ -57,7 +57,7 @@ Aucune VM n'a d'IP publique. Entrée : le LB (HTTPS) ou le bastion (SSH via IAP)
 |---|---|---|---|
 | Entrée | LB applicatif externe **régional** + certificat Google (Certificate Manager, autorisation DNS) | Géré, régional | Automatique (health check `/rp-health`) |
 | Reverse proxy + WAF | Apache 2.4 + ModSecurity 2 + OWASP CRS 3.3 (`rp-1`, `rp-2`) | 1 par DC | Automatique (LB) |
-| Application | `genarchi serve-api` + `genarchi consume`, systemd, virtualenv (4 serveurs) | 2 par DC | Automatique (Apache `mod_proxy_hcheck` sur `/readyz`) |
+| Application | `genarchi serve-api` + `genarchi consume`, systemd, virtualenv (4 serveurs) | 2 par DC | Automatique (Apache `mod_proxy_hcheck` sur `/healthz`, [ADR 0018](../adr/0018-p2-reglages-de-bascule.md)) |
 | Base | PostgreSQL 17 + Patroni 4, réplication **synchrone**, quorum etcd 3.5 (3 membres) | Primaire + réplica synchrone | **Automatique** (Patroni) ; désactivable (`patronictl pause`) |
 | IP virtuelle base | LB interne passthrough, sonde `GET :8008/primary` | Gérée | Suit le primaire en ~6 s |
 | Messages | RabbitMQ 4.0, 3 nœuds, file **quorum** `tickets.issue` + file de lettres mortes | 3 nœuds (majorité 2) | Automatique (Raft) |

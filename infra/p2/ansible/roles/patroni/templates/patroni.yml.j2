@@ -14,8 +14,8 @@ etcd3:
 
 bootstrap:
   dcs:
-    # Failover in ~20 s (was 30/10/10). Rule: loop_wait + 2 * retry_timeout <= ttl.
-    # Read at cluster creation only; on a running cluster use `patronictl edit-config`.
+    # Leader lock expires after 20 s (was 30/10/10); primary failover measured at ~30 s in the lab.
+    # Rule: loop_wait + 2 * retry_timeout <= ttl.
     ttl: 20
     loop_wait: 5
     retry_timeout: 5
