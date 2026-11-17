@@ -27,7 +27,7 @@ locals {
     BLOB_BACKEND      = "gcs"
     BLOB_GCS_BUCKET   = google_storage_bucket.tickets.name
     CHAOS_ENABLED     = tostring(var.chaos_enabled)
-    APP_VERSION       = var.app_version
+    # No APP_VERSION here: it is baked into the image, so each revision reports its own version.
   }
 }
 

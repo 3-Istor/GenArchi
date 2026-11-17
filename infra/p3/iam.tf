@@ -11,6 +11,7 @@ locals {
     api    = ["roles/datastore.user", "roles/cloudtrace.agent"]
     worker = ["roles/datastore.user", "roles/cloudtrace.agent"]
     events = ["roles/eventarc.eventReceiver"]
+    chaos  = ["roles/datastore.user"] # writes chaos/<region> only; Cloud Run pulls the image itself
   }
 }
 
@@ -65,31 +66,6 @@ resource "google_cloud_run_v2_job_iam_member" "scheduler_runs_jobs" {
   location = each.value.location
   role     = "roles/run.invoker"
   member   = "serviceAccount:${local.sa.scheduler}"
-}
-
-# Le test de panne modifie l'API d'une région puis la rétablit : il agit via l'API Cloud Run.
-resource "google_cloud_run_v2_service_iam_member" "chaos_manages_api" {
-  for_each = var.chaos_enabled ? google_cloud_run_v2_service.api : {}
-  name     = each.value.name
-  location = each.value.location
-  role     = "roles/run.developer"
-  member   = "serviceAccount:${local.sa.chaos}"
-}
-
-resource "google_service_account_iam_member" "chaos_acts_as_api" {
-  count              = var.chaos_enabled ? 1 : 0
-  service_account_id = google_service_account.sa["api"].name
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${local.sa.chaos}"
-}
-
-# Updating an env var creates a revision, which needs to read the image.
-resource "google_artifact_registry_repository_iam_member" "chaos_reads_images" {
-  count      = var.chaos_enabled ? 1 : 0
-  location   = google_artifact_registry_repository.app.location
-  repository = google_artifact_registry_repository.app.name
-  role       = "roles/artifactregistry.reader"
-  member     = "serviceAccount:${local.sa.chaos}"
 }
 
 # Pub/Sub écrit dans BigQuery avec son agent de service.

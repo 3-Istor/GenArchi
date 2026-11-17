@@ -34,5 +34,6 @@ Statuts autorisés : **proposé**, **accepté**, **rejeté**, **remplacé**. Le 
 | [0016](0016-p3-evenement-emis-par-firestore.md) | P3 : l'événement « billet créé » est émis par Firestore | proposé | — | — |
 | [0017](0017-p2-substitutions-outils.md) | P2 : substitutions d'outils (Apache + ModSecurity, rsyslog, timers) | proposé | — | — |
 | [0018](0018-p2-reglages-de-bascule.md) | P2 : réglages de bascule (Patroni, pool, sonde Apache, erreurs JSON) | proposé | — | — |
+| [0019](0019-p3-panne-de-region-et-canary.md) | P3 : panne de région par drapeau Firestore, canary avec trafic dédié | proposé | — | — |
 
 Sujets à instruire après coaching : application commune, environnements P2/P3, persistance, architecture de chaque plateforme et protocole de résilience. Cette liste ne préjuge d’aucun choix.

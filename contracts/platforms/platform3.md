@@ -43,7 +43,7 @@ Attendu : au moins **2 régions actives**, données multi-région, communication
 
 ## 5. Interface OpenTofu (`infra/p3/`)
 
-Entrées principales : `project_id`, `regions` (`["europe-west1", "europe-west4"]`, au moins 2), `firestore_location` (`eur3`), `storage_regions`, `domain` (`p3.genarchi.3istor.com`), `cloudflare_zone_id`, `app_image` (digest, écrit par `make p3-image`), `app_version`, `min_instances` (**≥ 1**, requis par *service health*), `max_instances` (plafond de coût), `chaos_enabled`, `chaos_schedule`, `chaos_unready_regions`, `alert_email`, `labels`. Détail : [`variables.tf`](../../infra/p3/variables.tf).
+Entrées principales : `project_id`, `regions` (`["europe-west1", "europe-west4"]`, au moins 2), `firestore_location` (`eur3`), `storage_regions`, `domain` (`p3.genarchi.3istor.com`), `cloudflare_zone_id`, `app_image` (digest, écrit par `make p3-image` ; la version de l'app est inscrite dans l'image), `min_instances` (**≥ 1**, requis par *service health*), `max_instances` (plafond de coût), `chaos_enabled`, `chaos_schedule`, `chaos_unready_regions`, `alert_email`, `labels`. Détail : [`variables.tf`](../../infra/p3/variables.tf).
 
 Sorties : `url`, `lb_ip`, `registry`, `image`, `regions`, `api_service`, `tickets_bucket`, `admin_token_secret`, `staff_token_secret`.
 

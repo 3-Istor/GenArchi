@@ -16,6 +16,8 @@ make p3-deploy     # registre → image (Cloud Build) → infra complète → sm
 
 Le certificat géré par Google est émis 15 à 60 min après que `p3.genarchi.3istor.com` pointe sur le LB ; pendant ce temps `p3-smoke` échoue en TLS.
 
+Redéployer après un `make p3-destroy` : la base Firestore a été conservée (`ABANDON`) et l'`apply` échouerait (« Database already exists »). La rattacher d'abord : `make p3-import-db`, puis `make p3-deploy`.
+
 Créer les index Firestore et la base prend quelques minutes au premier `apply`.
 
 ## Mettre une version en production
@@ -25,9 +27,9 @@ git checkout <tag>
 make p3-canary
 ```
 
-Pour chaque région, l'une après l'autre : nouvelle révision sans trafic → 10 % du trafic pendant 5 min → si plus de 2 % de 5xx (contrat P3), **retour automatique** à la révision stable et arrêt ; sinon 100 %. Puis OpenTofu enregistre l'image (le worker et les jobs passent aussi à la nouvelle version).
+Pour chaque région, l'une après l'autre : nouvelle révision sans trafic → 10 % du trafic pendant 5 min, pendant lesquelles la canary génère elle-même du trafic (`scripts/probe.py`, 5 achats/s, en-tête `X-GenArchi-Region` qui fixe la région au LB) → **retour automatique** à la révision stable et arrêt si la révision canary a reçu moins de 30 requêtes ou plus de 2 % de 5xx (contrat P3) ; sinon 100 %. Puis OpenTofu enregistre l'image (le worker et les jobs passent aussi à la nouvelle version). `/version` affiche la version de l'image servie : on y voit la canary pendant la fenêtre.
 
-Réglages : `WATCH_SECONDS=600 MAX_ERROR_RATIO=0.01 make p3-canary`.
+Réglages : `WATCH_SECONDS=600 MAX_ERROR_RATIO=0.01 MIN_REQUESTS=50 make p3-canary`.
 
 ## Retour arrière manuel
 

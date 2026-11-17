@@ -7,7 +7,7 @@ import logging
 import signal
 import sys
 import threading
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from . import domain
 from .config import get_settings
@@ -106,6 +106,20 @@ def cmd_seed(a) -> None:
     print(e.id)
 
 
+def chaos_region(store, region: str, seconds: int, now: datetime) -> datetime:
+    """Makes every API instance of `region` unready until now + seconds (the flag expires by itself)."""
+    until = now + timedelta(seconds=seconds)
+    store.set_unready_until(region, until)
+    return until
+
+
+def cmd_chaos_region(a) -> None:
+    c = _container("chaos-region")
+    until = chaos_region(c.store, a.region, a.seconds, datetime.now(UTC))
+    log.warning("chaos: region unready", extra={"region": a.region, "until": until.isoformat()})
+    print(until.isoformat())
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="genarchi")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -123,6 +137,10 @@ def main(argv: list[str] | None = None) -> None:
     sd.add_argument("--capacity", type=int, default=5000)
     sd.add_argument("--price-cents", type=int, default=2500)
     sd.set_defaults(fn=cmd_seed)
+    cr = sub.add_parser("chaos-region", help="test T4 : région non prête pendant --seconds")
+    cr.add_argument("--region", required=True)
+    cr.add_argument("--seconds", type=int, default=600)
+    cr.set_defaults(fn=cmd_chaos_region)
     a = p.parse_args(argv)
     a.fn(a)
 

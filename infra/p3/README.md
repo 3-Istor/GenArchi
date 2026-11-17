@@ -22,10 +22,12 @@ Monitoring : sonde externe, SLO 99,9 %, alerte burn rate
 | `monitoring.tf` | Sonde, SLO, alertes |
 | `scripts/` | Build de l'image (Cloud Build), smoke, canary avec retour arrière automatique |
 
-Cibles : `make p3-plan`, `p3-deploy`, `p3-canary`, `p3-smoke`, `p3-chaos-region`, `p3-destroy`. Variables : [`env.mk.example`](env.mk.example), [`variables.tf`](variables.tf).
+Cibles : `make p3-plan`, `p3-deploy`, `p3-canary`, `p3-smoke`, `p3-chaos-region`, `p3-import-db` (après un `p3-destroy`), `p3-destroy`. Variables : [`env.mk.example`](env.mk.example), [`variables.tf`](variables.tf).
 
 ## Ce qui a été vérifié
 
 - `tofu validate` (providers google 8.x, cloudflare 5.x) ; attributs contrôlés contre le schéma des providers ; frontière P2/P3 respectée.
 - L'app tourne en local « comme en P3 » (émulateurs Firestore et Pub/Sub, `make up-p3 smoke-local`) et passe les tests de contrat sur Firestore, dont 200 achats concurrents sur 100 places.
-- **Pas encore exécuté sur GCP** : `tofu apply`, Eventarc Firestore, bascule *service health*, canary, chaos nocturne.
+- **GCP, 2026-11-15** (projet de test, sans Cloud Armor faute de quota) : `tofu apply` après trois correctifs ; smoke 10/10, billet émis en 8 s par Eventarc Firestore ; région retirée du LB pendant 10 min, 0 échec sur 4 407 commandes. L'ancien job de panne n'a produit aucune panne (révision jamais prête) et la canary a promu `europe-west4` sans trafic : d'où l'[ADR 0019](../../docs/adr/0019-p3-panne-de-region-et-canary.md) (drapeau Firestore, routage par en-tête, trafic de canary).
+- **GCP, 2026-11-16** (mécanisme de l'ADR 0019, sonde à 5 achats/s) : `make p3-chaos-region` pose le drapeau sur `europe-west1` ; le `/readyz` de la région passe à 503 pendant 10 min, le LB sert `europe-west4` environ 20 s après et revient seul sur `europe-west1` à l'expiration. 0 échec sur 4 071 commandes, plus longue interruption 6,6 s, stock cohérent. Routage par en-tête vérifié sur les deux régions. `make p3-canary` avec son propre trafic : 247 requêtes sur la canary d'`europe-west1` et 141 sur celle d'`europe-west4`, 0 erreur 5xx, les deux promues ; `/version` montre la nouvelle image sur ~10 % des réponses pendant la fenêtre ; 0 échec sur 7 302 commandes côté client.
+- **Pas encore exécuté sur GCP** : Cloud Armor (quota à 0).

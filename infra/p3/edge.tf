@@ -86,6 +86,24 @@ resource "google_compute_backend_service" "api" {
   }
 }
 
+# One backend per region: requests with X-GenArchi-Region reach only that region (canary traffic, tests).
+resource "google_compute_backend_service" "api_region" {
+  for_each              = google_compute_region_network_endpoint_group.api
+  name                  = "${var.name_prefix}-api-${each.key}"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  protocol              = "HTTPS"
+  security_policy       = var.cloud_armor ? google_compute_security_policy.edge[0].id : null
+
+  backend {
+    group = each.value.id
+  }
+
+  log_config {
+    enable      = true
+    sample_rate = 1
+  }
+}
+
 resource "google_compute_backend_bucket" "front" {
   name        = "${var.name_prefix}-front"
   bucket_name = google_storage_bucket.front.name
@@ -106,12 +124,39 @@ resource "google_compute_url_map" "https" {
     path_matcher = "app"
   }
 
+  # route_rules (not path_rule, they cannot be mixed): header routing needs them.
   path_matcher {
     name            = "app"
     default_service = google_compute_backend_bucket.front.id
-    path_rule {
-      paths   = local.api_paths
-      service = google_compute_backend_service.api.id
+
+    # Lists, not maps: Google wants route_rules in increasing priority order (key = index here).
+    # Any path with X-GenArchi-Region goes to that region's backend (test traffic only).
+    dynamic "route_rules" {
+      for_each = var.regions
+      content {
+        priority = route_rules.key + 1
+        service  = google_compute_backend_service.api_region[route_rules.value].id
+        match_rules {
+          prefix_match = "/"
+          header_matches {
+            header_name = "X-GenArchi-Region"
+            exact_match = route_rules.value
+          }
+        }
+      }
+    }
+
+    # API paths without the header: the multi-region backend, as before. "/x/*" becomes prefix "/x/".
+    dynamic "route_rules" {
+      for_each = local.api_paths
+      content {
+        priority = route_rules.key + 100
+        service  = google_compute_backend_service.api.id
+        match_rules {
+          prefix_match    = endswith(route_rules.value, "/*") ? trimsuffix(route_rules.value, "*") : null
+          full_path_match = endswith(route_rules.value, "/*") ? null : route_rules.value
+        }
+      }
     }
   }
 }
