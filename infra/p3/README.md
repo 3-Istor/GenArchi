@@ -22,7 +22,7 @@ Monitoring : sonde externe, SLO 99,9 %, alerte burn rate
 | `monitoring.tf` | Sonde, SLO, alertes |
 | `scripts/` | Build de l'image (Cloud Build), smoke, canary avec retour arrière automatique |
 
-Cibles : `make p3-plan`, `p3-deploy`, `p3-canary`, `p3-smoke`, `p3-chaos-region`, `p3-destroy`. Variables : [`env.mk.example`](env.mk.example), [`variables.tf`](variables.tf).
+Cibles : `make p3-plan`, `p3-deploy`, `p3-canary`, `p3-smoke`, `p3-chaos-region`, `p3-import-db` (après un `p3-destroy`), `p3-destroy`. Variables : [`env.mk.example`](env.mk.example), [`variables.tf`](variables.tf).
 
 ## Ce qui a été vérifié
 

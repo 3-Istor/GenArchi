@@ -10,6 +10,7 @@ mapfile -t regions < <(tofu -chdir="$P3_DIR" output -json regions | jq -r '.[]')
 WATCH_SECONDS="${WATCH_SECONDS:-300}"
 MAX_ERROR_RATIO="${MAX_ERROR_RATIO:-0.02}"  # contrat P3 : rollback au-delà de 2 % de 5xx
 MIN_REQUESTS="${MIN_REQUESTS:-30}"         # sans assez de trafic sur la canary, pas de promotion
+((MIN_REQUESTS >= 1)) || { echo "MIN_REQUESTS doit valoir au moins 1" >&2; exit 2; }
 run() { gcloud run "$@" --project "$P3_PROJECT" --quiet; }
 root="$(git rev-parse --show-toplevel)"
 url="$(tofu -chdir="$P3_DIR" output -raw url)"
@@ -28,6 +29,8 @@ for region in "${regions[@]}"; do
   canary="$(run services describe "$svc" --region "$region" --format='value(status.latestCreatedRevisionName)')"
   run services update-traffic "$svc" --region "$region" --to-revisions "$canary=10,$stable=90"
   rollback() { echo "[$region] $1 : retour à $stable" >&2; run services update-traffic "$svc" --region "$region" --to-revisions "$stable=100"; exit 1; }
+  # Any failure or interruption while the canary holds 10 % sends the traffic back to the stable revision.
+  trap 'rollback "interrompue"' ERR INT TERM
   # Our own traffic, pinned to this region through the LB (and the WAF): the canary gets ~10 % of it.
   echo "[$region] $canary reçoit 10 % pendant ${WATCH_SECONDS}s, sonde à 5 achats/s sur cette région"
   python3 "$root/scripts/probe.py" "$url" "$token" --seconds "$WATCH_SECONDS" --rate 5 \
@@ -40,6 +43,7 @@ for region in "${regions[@]}"; do
   if awk -v e="$errors" -v t="$total" -v m="$MAX_ERROR_RATIO" 'BEGIN { exit !(e / t > m) }'; then
     rollback "seuil de 5xx dépassé"
   fi
+  trap - ERR INT TERM
   run services update-traffic "$svc" --region "$region" --to-latest
   echo "[$region] $canary promue à 100 %"
 done

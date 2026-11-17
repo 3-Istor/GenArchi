@@ -23,8 +23,8 @@ make p3-chaos-region
 
 Observer : `GET https://p3.genarchi.3istor.com/version` répond depuis l'autre région en moins d'une minute.
 
-Observer une région précise : ajouter l'en-tête `X-GenArchi-Region: europe-west4` (ou `europe-west1`), que le LB route vers cette seule région.
+Observer une région précise : ajouter l'en-tête `X-GenArchi-Region: europe-west4` (ou `europe-west1`), que le LB route vers cette seule région. Avec cet en-tête, tous les chemins vont à l'API : le front n'y est pas servi (404).
 
-Arrêter le test en cours : reposer le drapeau à l'instant présent, `gcloud run jobs execute p3-chaos-region --region europe-west1 --args=chaos-region,--region,europe-west1,--seconds,0`. Les instances redeviennent prêtes en moins de 5 s.
+Arrêter le test en cours : reposer le drapeau à l'instant présent, `gcloud run jobs execute p3-chaos-region --region europe-west1 --args=chaos-region,--region,europe-west1,--seconds,0`. Les instances redeviennent prêtes environ 10 s après l'écriture (relecture toutes les 5 s, puis la sonde de readiness), et le LB revient ensuite sur la région.
 
 Désactiver : `chaos_enabled = false` (variable OpenTofu).

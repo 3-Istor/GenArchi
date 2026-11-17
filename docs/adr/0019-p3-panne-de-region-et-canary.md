@@ -27,3 +27,5 @@ Sur GCP (2026-11-15), le test de panne de région ne produisait aucune panne : l
 - N'importe quel client peut fixer une région avec l'en-tête : sans privilège ni donnée en jeu, mais il contourne la bascule pour ses propres requêtes. Réservé aux tests.
 - La canary crée des commandes de test (un événement « Sonde » par région et par mise en production).
 - Le job de panne reçoit des jetons factices : la configuration les exige, le job ne sert aucune requête et n'accède pas aux secrets.
+- `roles/datastore.user` couvre toute la base `(default)` (commandes, billets compris) : une base unique ne se restreint pas davantage. Le moindre privilège tient au niveau du service (plus de droits Cloud Run), pas du document.
+- La canary revient à la révision stable sur toute erreur ou interruption pendant la fenêtre (piège `ERR INT TERM`), et refuse `MIN_REQUESTS` inférieur à 1.
