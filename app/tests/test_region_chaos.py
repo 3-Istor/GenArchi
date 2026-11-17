@@ -48,6 +48,29 @@ def test_flag_read_error_keeps_api_ready():
     assert _client(Broken()).get("/readyz").status_code == 200
 
 
+def test_malformed_flag_keeps_api_ready():
+    store = MemoryStore()
+    store.chaos["europe-west1"] = "2030-01-01T00:00:00Z"  # written by hand as a string
+    assert _client(store).get("/readyz").status_code == 200
+
+
+def test_read_error_keeps_an_active_flag():
+    class Flaky(MemoryStore):
+        fail = False
+
+        def unready_until(self, region):
+            if self.fail:
+                raise RuntimeError("firestore blip")
+            return super().unready_until(region)
+
+    store, now = Flaky(), [100.0]
+    chaos_region(store, "europe-west1", 600, datetime.now(UTC))
+    flag = RegionFlag(store, "europe-west1", clock=lambda: now[0])
+    assert flag.unready() is True
+    store.fail, now[0] = True, now[0] + 5.0
+    assert flag.unready() is True
+
+
 def test_region_flag_rereads_at_most_every_5s():
     store, now = MemoryStore(), [100.0]
     flag = RegionFlag(store, "europe-west1", clock=lambda: now[0])

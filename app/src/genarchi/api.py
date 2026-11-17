@@ -158,10 +158,10 @@ class RegionFlag:
         if self.checked_at is None or now - self.checked_at >= self.ttl:
             self.checked_at = now
             try:
-                self.until = self.store.unready_until(self.region)
-            except Exception:  # readiness of the database is checked separately
+                v = self.store.unready_until(self.region)
+                self.until = v if isinstance(v, datetime) else None  # a hand-written string never sticks
+            except Exception:  # keep the last value: its expiry is absolute; the database is checked apart
                 log.warning("readiness: chaos flag unreadable", exc_info=True)
-                self.until = None
         return self.until is not None and datetime.now(UTC) < self.until
 
 

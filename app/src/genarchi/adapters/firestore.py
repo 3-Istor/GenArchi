@@ -54,7 +54,8 @@ class FirestoreStore:
 
     # --- panne de région (test T4) : chaos/<région>.unready_until ----------------------------------
     def unready_until(self, region: str) -> datetime | None:
-        snap = self.db.collection("chaos").document(region).get(timeout=2)
+        # Short timeout: /readyz also pings the database under a 2 s readiness probe.
+        snap = self.db.collection("chaos").document(region).get(timeout=0.5)
         return snap.get("unready_until") if snap.exists else None
 
     def set_unready_until(self, region: str, until: datetime) -> None:

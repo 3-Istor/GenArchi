@@ -103,6 +103,9 @@ class PostgresStore:
         with self.pool.connection(timeout=1) as c:
             c.execute("SELECT 1")
 
+    def unready_until(self, region: str) -> datetime | None:
+        return None  # region failure flag is P3 only (Firestore)
+
     def migrate(self) -> list[str]:
         applied = []
         with self._conn() as c:
@@ -168,7 +171,9 @@ class PostgresStore:
                     inserted = c.execute(
                         "INSERT INTO orders (id, event_id, buyer_email, quantity, amount_cents, "
                         "idempotency_key, request_hash, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) "
-                        "ON CONFLICT (event_id, idempotency_key) DO NOTHING RETURNING id",
+                        # No conflict target: id derives from (event_id, key), so a concurrent twin may hit
+                        # orders_pkey first; both mean the same order.
+                        "ON CONFLICT DO NOTHING RETURNING id",
                         (
                             oid,
                             event_id,
